@@ -8,7 +8,7 @@
 # Quit the OneDrive application if it's running.
 # Delete ~/Library/Containers/com.microsoft.OneDrive-mac.
 # Delete ~/Library/Containers/com.microsoft.OneDriveLauncher (if it exists).
-# Restart your Mac, or open Terminal and run the command killall -SIGTERM cfprefsd.
+# Run the command killall -SIGTERM cfprefsd.
 # Restart the OneDrive application.
 ############################################################################
 clear
