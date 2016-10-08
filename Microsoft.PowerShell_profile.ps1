@@ -11,7 +11,7 @@ Copyright (C) 2013 Microsoft Corporation. All rights reserved.
 
 # -Optional- Specify custom font colors
 # Uncomment the following if block to tweak the colors of your console; the 'if' statement is to make sure we leave the ISE host alone
-if ($host.Name -eq 'ConsoleHost') 
+if ($host.Name -eq 'ConsoleHost')
 {
     $host.ui.rawui.backgroundcolor = 'gray'
     $host.ui.rawui.foregroundcolor = 'darkblue'
@@ -51,37 +51,14 @@ if ("$env:USERPROFILE" -ne "$home") {
 }
 #>
 
-# dot-source my SyncProfiles.ps1 script, which defines the following cmdlets / functions
-. .\Scripts\SyncProfiles.ps1
-function Sync-Profile 
-{
-    param (
-        [String[]]
-        [ValidateSet('Push','Pull')]
-        $Direction
-    )
-    switch ($Direction) {
-        Push 
-        {
-            Sync-Sperry
-            Sync-PSLogger
-            # Sync-ProfilePal
-            Merge-LocalShare
-            Merge-AdminShare
-        }
-        Pull 
-        {
-            Sync-Sperry
-            Sync-PSLogger
-            # Sync-ProfilePal
-            # Sync-AdminShare *** Need to figure out how to exclude WindowsPowerShell from syncing down to H:\My Documents\Infrastructure, before re-enabling
-            Sync-LocalShare
-        }
-    }
-}
-
 # dot-source script file containing Get-NetSite function
 . .\Scripts\NetSiteName.ps1
+
+# dot-source Out-Copy function script
+. .\Scripts\out-copy.ps1
+
+# dot-source Out-Highligt function script
+. .\Out-Highlight.ps1
 
 # Write-Output -InputObject 'Network connection info:'
 Write-Log -Message "Connected at $((Get-NetSite).SiteName) ($((Get-NetSite).IPAddress | Select-Object -First 1))" -Function $env:USERNAME -Verbose
@@ -92,14 +69,48 @@ Backup-Logs
 
 Set-WindowTitle
 
+function Find-UpdatedDSCResource {
+
+$MyDSCmodules = Get-Module -ListAvailable | Where-Object {'DSC' -in $_.Tags} | Select-Object -Property Name,Version
+
+    Write-Output -InputObject 'Checking PowerShellGallery for new or updated DSC Resources'
+    Write-Output -InputObject 'Find-Package -ProviderName PowerShellGet -Tag DscResource | Format-List -Property Name,Status,Summary'
+    #Find-Package -ProviderName PowerShellGet -Tag DscResource | Format-List -Property Name,Status,Summary | Out-Host -Paging
+    $DSCResources = Find-Module -Tag DscResource -Repository PSGallery
+    foreach ($pkg in $DSCResources)
+    {
+        if ($pkg -in $MyDSCmodules.Name) {
+            if ($pkg.Version -gt $MyDSCmodules.$($pkg.Name).Version) {
+                "Update to $pkg.Name is available"
+            }
+        }
+        else
+        {
+            "Reviewing new DSC Resource module packages available from PowerShellGallery"
+            $pkg | Format-List -Property Name,Description,Dependencies,PublishedDate;
+            if ([string](Read-Host -Prompt 'Would you like to install this resource module? [Y/N]') -eq 'y'){
+                Write-Output -InputObject "Installing and importing $($pkg.Name) from PowerShellGallery"
+                $pkg | Install-Module -Scope CurrentUser -Verbose
+                Import-Module -Name $pkg.Name -PassThru -Verbose
+            }
+            else
+            {
+                Write-Output -InputObject ' moving on ...'
+            }
+        Write-Output -InputObject ' # # # Next Module # # #'
+        }
+    }
+}
+
+# Find-UpdatedDSCResources
+
+function Get-PSGalleryModule
+{
+    Find-Module -Repository psgallery | Sort-Object -Descending -Property PublishedDate | Select-Object -First 30 | Format-List Name, PublishedDate, Description, Version | Out-Host -Paging
+}
+
 # re-open Visual Studio code PowerShell extension examples
-#& code $env:USERPROFILE\.vscode\extensions\ms-vscode.PowerShell\examples
-
-# dot-source Out-Copy function script
-. .\Scripts\out-copy.ps1
-
-# dot-source Out-Highligt function script
-. .\Out-Highlight.ps1
+& code $env:USERPROFILE\.vscode\extensions\ms-vscode.PowerShell\examples
 
 # Setup PS aliases for launching common apps, including XenApp
 New-Alias -Name rdp -Value Start-RemoteDesktop -ErrorAction Ignore
@@ -114,86 +125,85 @@ New-Alias -Name pa_edit -Value C:\SWTOOLS\PortableApps\SublimeText3Portable\App\
 
 New-Alias -Name rename -Value Rename-Item
 
-function xa_assyst 
+function xa_assyst
 {
-    Start-XenApp -Qlaunch assyst 
+    Start-XenApp -Qlaunch assyst
 }
-function xa_cmd 
+function xa_cmd
 {
-    Start-XenApp -Qlaunch cmd 
+    Start-XenApp -Qlaunch cmd
 }
-function xa_excel 
+function xa_excel
 {
-    Start-XenApp -Qlaunch excel 
+    Start-XenApp -Qlaunch excel
 }
 New-Alias -Name xa_xl -Value xa_excel
-function xa_hdrive 
+function xa_hdrive
 {
-    Start-XenApp -Qlaunch h_drive 
+    Start-XenApp -Qlaunch h_drive
 }
 New-Alias -Name xa_explorer -Value xa_hdrive
 
 New-Alias -Name xa_h -Value xa_hdrive
-function xa_IE 
+function xa_IE
 {
-    Start-XenApp -Qlaunch IE 
+    Start-XenApp -Qlaunch IE
 }
-function xa_itsc 
+function xa_itsc
 {
-    Start-XenApp -Qlaunch itsc 
+    Start-XenApp -Qlaunch itsc
 }
-function xa_firefox 
+function xa_firefox
 {
-    Start-XenApp -Qlaunch FireFox 
+    Start-XenApp -Qlaunch FireFox
 }
-function xa_mstsc 
+function xa_mstsc
 {
-    Start-XenApp -Qlaunch mstsc 
+    Start-XenApp -Qlaunch mstsc
 }
 New-Alias -Name xa_rdp -Value xa_mstsc
-function xa_onenote 
+function xa_onenote
 {
-    Start-XenApp -Qlaunch onenote 
+    Start-XenApp -Qlaunch onenote
 }
-function xa_outlook 
+function xa_outlook
 {
-    Start-XenApp -Qlaunch outlook 
+    Start-XenApp -Qlaunch outlook
 }
-function xa_powerpoint 
+function xa_powerpoint
 {
-    Start-XenApp -Qlaunch powerpoint 
+    Start-XenApp -Qlaunch powerpoint
 }
 New-Alias -Name xa_ppt -Value xa_powerpoint
-function xa_sdrive 
+function xa_sdrive
 {
-    Start-XenApp -Qlaunch s_drive 
+    Start-XenApp -Qlaunch s_drive
 }
 New-Alias -Name xa_s -Value xa_sdrive
-function xa_skype 
+function xa_skype
 {
     Start-XenApp -Qlaunch 'Skype for Business'
 }
 New-Alias -Name xa_s4b -Value xa_skype
-function xa_synergy 
+function xa_synergy
 {
-    Start-XenApp -Qlaunch synergy 
+    Start-XenApp -Qlaunch synergy
 }
-function xa_visio 
+function xa_visio
 {
-    Start-XenApp -Qlaunch visio 
+    Start-XenApp -Qlaunch visio
 }
-function xa_word 
+function xa_word
 {
-    Start-XenApp -Qlaunch word 
+    Start-XenApp -Qlaunch word
 }
-function xa_reconnect 
+function xa_reconnect
 {
-    Start-XenApp -Reconnect 
+    Start-XenApp -Reconnect
 }
 
 function logon-work
 {
-    .\Scripts\Toggle-Wireless.ps1
     Set-Workplace -zone Office
 }
 
@@ -201,7 +211,6 @@ New-Alias -Name start-work -Value logon-work
 
 function logoff-work
 {
-    .\Scripts\Toggle-Wireless.ps1
     Set-Workplace -zone Remote
 }
 
