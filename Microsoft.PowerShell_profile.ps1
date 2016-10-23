@@ -1,16 +1,19 @@
-#Requires -Version 3.0 -Module PSLogger
+#Requires -Version 3.0
+# -Module PSLogger
 # PowerShell $Profile
-# Created by New-Profile cmdlet in ProfilePal Module
+# Originally created by New-Profile cmdlet in ProfilePal Module; modified for use on Mac by @bcdady 2016-09-27
+# ~/.config/powershell/Microsoft.PowerShell_profile.ps1    
 
 $Script:startingPath = $pwd
 # capture starting path so we can go back after other things happen
 $Global:defaultBanner = @'
 Windows PowerShell
-Copyright (C) 2013 Microsoft Corporation. All rights reserved.
+Copyright (C) 2016 Microsoft Corporation. All rights reserved.
 '@
 
 # -Optional- Specify custom font colors
 # Uncomment the following if block to tweak the colors of your console; the 'if' statement is to make sure we leave the ISE host alone
+<#
 if ($host.Name -eq 'ConsoleHost') 
 {
     $host.ui.rawui.backgroundcolor = 'gray'
@@ -23,33 +26,82 @@ if ($host.Name -eq 'ConsoleHost')
     Write-Output -InputObject $defaultBanner
     # after clear-host, restore default PowerShell banner
 }
+#>
 
-Write-Log -Message "`n`tLoading PowerShell `$Profile: CurrentUserCurrentHost`n"-Function $env:USERNAME -Verbose
+Write-Output -InputObject "`n`tLoading PowerShell `$Profile: CurrentUserCurrentHost`n"
 
-Write-Log -Message "`nCurrent PS execution policy is: $env:PSExecutionPolicyPreference" -Function $env:USERNAME
+ # or $host.Version.ToString()
+
+# move/copy to AllUsersAllHosts
+<# Get-Variable -Name Is*                                                                                
+
+Name                           Value                                                                                  
+----                           -----                                                                                  
+IsCoreCLR                      True                                                                                   
+IsLinux                        False                                                                                  
+IsOSX                          True                                                                                   
+IsWindows                      False  
+#>
+if ($IsWindows) { $hostOS = 'Windows' } 
+if ($IsLinux)   { $hostOS = 'Linux' } 
+if ($IsOSX)     { $hostOS = 'OSX' }
+
+Write-Output -InputObject "Setting environment HostOS to $hostOS"
+$env:HostOS = $hostOS
+
+Write-Output -InputObject " # $ShellId $($Host.version.tostring().substring(0,3)) $PSEdition on $hostOS#"
+
 Write-Output -InputObject "`nCurrent PS execution policy is: "
-Get-ExecutionPolicy -List | Format-Table -AutoSize
+Get-ExecutionPolicy -List | Format-Table -AutoSize    
 
 # Learn PowerShell today ...
 # Thanks for this tip goes to: http://jdhitsolutions.com/blog/essential-powershell-resources/
 Write-Output -InputObject ' # selecting (2) random PowerShell cmdlet help to review #'
 
-Get-Command -Module Microsoft*, Cim*, PS*, ISE |
-    Get-Random |
-    Get-Help -ShowWindow
+if ($IsWindows)
+{
+    Get-Command -Module Microsoft*, Cim*, PS*, ISE |
+        Get-Random |
+        Get-Help -ShowWindow
 
-Get-Random -InputObject (Get-Help -Name about*) |
-    Get-Help -ShowWindow
+    Get-Random (Get-Help -Name about_*) |
+        Get-Help -ShowWindow
+}
 
 # Invoke-Expression (New-Object Net.WebClient).DownloadString('http://bit.ly/e0Mw9w')
 
 <# check and conditionally update/fix PSModulePath
-$env:PSModulePath = @("$home\Documents\WindowsPowerShell\Modules"; "$pshome\Modules"; "${env:ProgramFiles(x86)}\WindowsPowerShell\Modules"; "$env:ProgramFiles\WindowsPowerShell\Modules") -join ';'
-
-if ("$env:USERPROFILE" -ne "$home") {
-    $Env:PSModulePath = $Env:PSModulePath + ";$env:USERPROFILE\Documents\WindowsPowerShell\Modules"
-}
+on Mac, default PSMODULEPATH (yes, it's case sensitive) is: $env:USERPROFILE/.local/share/powershell/Modules;;/usr/local/microsoft/powershell/Modules
 #>
+
+if ($IsWindows)
+{
+    $splitChar = ';'
+    $myPSmodPath = (Join-Path -Path $HOME -ChildPath 'Documents' -AdditionalChildPath 'WindowsPowerShell\Modules')
+    if (-not (Test-Path -Path $myPSmodPath)
+    {
+        New-Item -Path (Join-Path -Path $HOME -ChildPath 'Documents' -AdditionalChildPath 'WindowsPowerShell') -ItemType Directory -Name 'Modules'
+    }
+    if ("$env:USERPROFILE" -ne "$HOME")
+    {
+        $env:PSMODULEPATH  = $env:PSMODULEPATH  + ";$myPSmodPath"
+    }
+}
+else
+{
+    $splitChar = ':'
+    $myPSmodPath = (Join-Path -Path $HOME -ChildPath '.local/share/powershell/Modules')
+    # OR /usr/local/share/powershell/Modules
+}
+
+Write-Output -InputObject "PowerShell Modules Path: $myPSmodPath"
+Write-Output -InputObject "PowerShell Scripts Path: $($myPSmodPath.Replace('/Modules','/scripts'))"
+
+if (-not ($myPSmodPath -in @($env:PSMODULEPATH -split $splitChar)))
+{
+    # Improve to only conditionally modify 
+    # $env:PSMODULEPATH = @("$HOME\Documents\WindowsPowerShell\Modules"; "$pshome\Modules"; "${env:ProgramFiles(x86)}\WindowsPowerShell\Modules"; "$env:ProgramFiles\WindowsPowerShell\Modules") -join ';'
+}
 
 # dot-source my SyncProfiles.ps1 script, which defines the following cmdlets / functions
 . .\Scripts\SyncProfiles.ps1
@@ -84,10 +136,10 @@ function Sync-Profile
 . .\Scripts\NetSiteName.ps1
 
 # Write-Output -InputObject 'Network connection info:'
-Write-Log -Message "Connected at $((Get-NetSite).SiteName) ($((Get-NetSite).IPAddress | Select-Object -First 1))" -Function $env:USERNAME -Verbose
+Write-Output -InputObject "Connected at $((Get-NetSite).SiteName) ($((Get-NetSite).IPAddress | Select-Object -First 1))"
 
 # Prompt to backup log files
-Write-Log -Message 'Archive PowerShell logs' -Function $env:USERNAME
+Write-Output -InputObject 'Archive PowerShell logs'
 Backup-Logs
 
 Set-WindowTitle
