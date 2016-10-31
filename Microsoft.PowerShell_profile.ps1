@@ -82,6 +82,8 @@ on Mac, default PSMODULEPATH (yes, it's case sensitive) is: $env:USERPROFILE/.lo
 
 if ($IsWindows)
 {
+    # Use local $HOME if GPO/UNC $HOME is not available
+    if (-not (test-path -path $HOME)) {Set-Variable -Name HOME -Value $Env:USERPROFILE -Force}
     $splitChar = ';'
     $myPSmodPath = (Join-Path -Path $HOME -ChildPath 'Documents\WindowsPowerShell\Modules')
     if (-not (Test-Path -Path $myPSmodPath))
@@ -100,8 +102,8 @@ else
     # OR /usr/local/share/powershell/Modules
 }
 
-Write-Output -InputObject "PowerShell Modules Path: $myPSmodPath"
-Write-Output -InputObject "PowerShell Scripts Path: $($myPSmodPath.Replace('Modules','Scripts'))"
+Write-Output -InputObject "Modules Path: $myPSmodPath"
+Write-Output -InputObject "Scripts Path: $($myPSmodPath.Replace('Modules','Scripts'))"
 
 if (-not ($myPSmodPath -in @($env:PSMODULEPATH -split $splitChar)))
 {
@@ -109,8 +111,21 @@ if (-not ($myPSmodPath -in @($env:PSMODULEPATH -split $splitChar)))
     # $env:PSMODULEPATH = @("$HOME\Documents\WindowsPowerShell\Modules"; "$pshome\Modules"; "${env:ProgramFiles(x86)}\WindowsPowerShell\Modules"; "$env:ProgramFiles\WindowsPowerShell\Modules") -join ';'
 }
 
+# try to update PS help files, if we have local admin role/rights 
+if (([security.principal.windowsprincipal] [security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+{
+    Get-Module -ListAvailable | Where HelpInfoUri | sort -Property Name -Unique | foreach {"Attempting to update-help -Module $($PSItem.Name)"; update-help -Module $($PSItem.Name)}
+}
+else
+{
+    Write-Output -InputObject "Skipping update-help, because we're either not on Windows, or do not have admin permissions`nConsider using get-help [term] -Online"
+}
+
 # dot-source script file containing Get-NetSite function
 . .\Scripts\NetSiteName.ps1
+# Write-Output -InputObject 'Network connection info:'
+$NetInfo = Get-NetSite
+Write-Output -InputObject "Connected at Site: $($NetInfo.SiteName) (Address: $($NetInfo.IPAddress))" # | Select-Object -First 1))"
 
 <# -suspending until PS v4
 # dot-source Out-Copy function script
@@ -119,9 +134,6 @@ if (-not ($myPSmodPath -in @($env:PSMODULEPATH -split $splitChar)))
 # dot-source Out-Highligt function script
 . .\Out-Highlight.ps1
 #>
-
-# Write-Output -InputObject 'Network connection info:'
-Write-Output -InputObject "Connected at $((Get-NetSite).SiteName) ($((Get-NetSite).IPAddress | Select-Object -First 1))"
 
 # Prompt to backup log files
 Write-Output -InputObject 'Archive PowerShell logs'
