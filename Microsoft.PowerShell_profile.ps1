@@ -1,3 +1,4 @@
+#!/usr/local/bin/powershell
 #Requires -Version 3.0
 # -Module PSLogger
 # PowerShell $Profile
@@ -5,31 +6,7 @@
 # ~/.config/powershell/Microsoft.PowerShell_profile.ps1    
 
 $Script:startingPath = $pwd
-# capture starting path so we can go back after other things happen
-<#$Global:defaultBanner = @'
-Windows PowerShell
-Copyright (C) 2016 Microsoft Corporation. All rights reserved.
-'@
-
-# -Optional- Specify custom font colors
-# Uncomment the following if block to tweak the colors of your console; the 'if' statement is to make sure we leave the ISE host alone
-<#if ($host.Name -eq 'ConsoleHost')
-{
-    $host.ui.rawui.backgroundcolor = 'gray'
-    $host.ui.rawui.foregroundcolor = 'darkblue'
-    # blue on gray work well in Console
-    Clear-Host
-    # clear-host refreshes the background of the console host to the new color scheme
-    Start-Sleep -Seconds 1
-    # wait a second for the clear command to refresh
-    Write-Output -InputObject $defaultBanner
-    # after clear-host, restore default PowerShell banner
-}
-#>
-
 Write-Output -InputObject "`n`tLoading PowerShell `$Profile: CurrentUserCurrentHost`n"
-
- # or $host.Version.ToString()
 
 # move/copy to AllUsersAllHosts
 <# Get-Variable -Name Is*                                                                                
@@ -54,7 +31,7 @@ if ($IsOSX)     { $hostOS = 'OSX' }
 
 Write-Output -InputObject " # $ShellId $($Host.version.tostring().substring(0,3)) $PSEdition on $hostOS #"
 
-Write-Output -InputObject "Setting environment HostOS to $hostOS"
+Write-Verbose -Message "Setting environment HostOS to $hostOS"
 $env:HostOS = $hostOS
 
 Write-Output -InputObject "`nCurrent PS execution policy is: "
@@ -62,7 +39,7 @@ Get-ExecutionPolicy -List | Format-Table -AutoSize
 
 # Learn PowerShell today ...
 # Thanks for this tip goes to: http://jdhitsolutions.com/blog/essential-powershell-resources/
-Write-Output -InputObject ' # selecting (2) random PowerShell cmdlet help to review #'
+Write-Verbose -Message ' # selecting (2) random PowerShell cmdlet help to review #'
 
 if ($IsWindows)
 {
@@ -81,7 +58,7 @@ Write-Output -InputObject ''
 on Mac, default PSMODULEPATH (yes, it's case sensitive) is: $env:USERPROFILE/.local/share/powershell/Modules;;/usr/local/microsoft/powershell/Modules
 #>
 
-Write-Output -InputObject 'Check Modules Paths: $myPSmodPath'
+Write-Verbose -Message 'Check Modules Paths: $myPSmodPath'
 if ($IsWindows)
 {
     # Use local $HOME if GPO/UNC $HOME is not available
@@ -104,20 +81,20 @@ else
     # OR /usr/local/share/powershell/Modules
 }
 
-Write-Output -InputObject "Modules Path: $myPSmodPath"
-Write-Output -InputObject "Scripts Path: $($myPSmodPath.Replace('Modules','Scripts'))"
+Write-Verbose -Message "Modules Path: $myPSmodPath"
+Write-Verbose -Message "Scripts Path: $($myPSmodPath.Replace('Modules','Scripts'))"
 
 if (-not ($myPSmodPath -in @($env:PSMODULEPATH -split $splitChar)))
 {
     # Improve to only conditionally modify 
     # $env:PSMODULEPATH = @("$HOME\Documents\WindowsPowerShell\Modules"; "$pshome\Modules"; "${env:ProgramFiles(x86)}\WindowsPowerShell\Modules"; "$env:ProgramFiles\WindowsPowerShell\Modules") -join ';'
-    Write-Output -InputObject "Adding Modules Path: $myPSmodPath to `$env:PSMODULEPATH"
+    Write-Verbose -Message "Adding Modules Path: $myPSmodPath to `$env:PSMODULEPATH"
     $env:PSMODULEPATH += ';' + $myPSmodPath
     $env:PSMODULEPATH
 }
 
 # try to update PS help files, if we have local admin role/rights
-Write-Output -InputObject 'Checking if PS Help files are due to be updated' 
+Write-Verbose -Message 'Checking if PS Help files are due to be updated' 
 if (([security.principal.windowsprincipal] [security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
 {
     if (-not ($Global:PSState))
@@ -126,7 +103,7 @@ if (([security.principal.windowsprincipal] [security.principal.windowsidentity]:
     }
     # Check $PSHelpUpdatedDate, from previously saved state; should be loaded from json file into variable by Sperry     
     $PSHelpUpdatedDate = Get-Date -Date ($Global:PSState.HelpUpdatedDate -as [DateTime])
-    Write-Output -InputObject "PS Help (Last) Updated Date: $PSHelpUpdatedDate"
+    Write-Verbose -Message "PS Help (Last) Updated Date: $PSHelpUpdatedDate"
     $NextUpdateDate = $PSHelpUpdatedDate.AddDays(10)
     Write-Debug -Message "PS Help Next Update Date: $NextUpdateDate"
     # Is today on or after $NextUpdateDate ?
@@ -163,30 +140,38 @@ Write-Output -InputObject ''
 $NetInfo = Get-NetSite
 Write-Output -InputObject "Connected at Site: $($NetInfo.SiteName) (Address: $($NetInfo.IPAddress))" # | Select-Object -First 1))"
 
-Write-Output -InputObject 'Importing function Out-Copy'
+Write-Output -InputObject ''
+# dot-source script file containing PowerDiff function
+. .\Scripts\PowerDiff.ps1
+
+Write-Output -InputObject ''
+# dot-source script file containing PowerDiff function
+. .\Scripts\VS-Code.ps1
+
+Write-Verbose -Message 'Importing function Out-Copy'
 # dot-source Out-Copy function script
 . .\Scripts\out-copy.ps1
 
-Write-Output -InputObject 'Importing function Out-Highlight'
+Write-Verbose -Message 'Importing function Out-Highlight'
 # dot-source Out-Highlight function script
 . .\Out-Highlight.ps1
 
 Write-Output -InputObject ''
 # Prompt to backup log files
-Write-Output -InputObject 'Archive PowerShell logs'
+Write-Verbose -Message 'Archive PowerShell logs'
 Backup-Logs
 
-Write-Output -InputObject ''
-Write-Output -InputObject 'Updating this window title'
+Write-Verbose -Message ''
+Write-Verbose -Message 'Updating this window title'
 Set-WindowTitle
 
-Write-Output -InputObject 'Declaring function Find-UpdatedDSCResource'
+Write-Verbose -Message 'Declaring function Find-UpdatedDSCResource'
 function Find-UpdatedDSCResource {
 
 $MyDSCmodules = Get-Module -ListAvailable | Where-Object {'DSC' -in $_.Tags} | Select-Object -Property Name,Version
 
     Write-Output -InputObject 'Checking PowerShellGallery for new or updated DSC Resources'
-    Write-Output -InputObject 'Find-Package -ProviderName PowerShellGet -Tag DscResource | Format-List -Property Name,Status,Summary'
+    Write-Verbose -Message 'Find-Package -ProviderName PowerShellGet -Tag DscResource | Format-List -Property Name,Status,Summary'
     #Find-Package -ProviderName PowerShellGet -Tag DscResource | Format-List -Property Name,Status,Summary | Out-Host -Paging
     $DSCResources = Find-Module -Tag DscResource -Repository PSGallery
     foreach ($pkg in $DSCResources)
@@ -201,22 +186,22 @@ $MyDSCmodules = Get-Module -ListAvailable | Where-Object {'DSC' -in $_.Tags} | S
             "Reviewing new DSC Resource module packages available from PowerShellGallery"
             $pkg | Format-List -Property Name,Description,Dependencies,PublishedDate;
             if ([string](Read-Host -Prompt 'Would you like to install this resource module? [Y/N]') -eq 'y'){
-                Write-Output -InputObject "Installing and importing $($pkg.Name) from PowerShellGallery"
+                Write-Verbose -Message "Installing and importing $($pkg.Name) from PowerShellGallery"
                 $pkg | Install-Module -Scope CurrentUser -Verbose
                 Import-Module -Name $pkg.Name -PassThru -Verbose
             }
             else
             {
-                Write-Output -InputObject ' moving on ...'
+                Write-Verbose -Message ' moving on ...'
             }
-        Write-Output -InputObject ' # # # Next Module # # #'
+        Write-Verbose -Message ' # # # Next Module # # #'
         }
     }
 }
 
 # Find-UpdatedDSCResources
 
-Write-Output -InputObject 'Declaring function Get-PSGalleryModule'
+Write-Verbose -Message 'Declaring function Get-PSGalleryModule'
 function Get-PSGalleryModule
 {
     Find-Module -Repository psgallery | Sort-Object -Descending -Property PublishedDate | Select-Object -First 30 | Format-List Name, PublishedDate, Description, Version | Out-Host -Paging
@@ -224,74 +209,6 @@ function Get-PSGalleryModule
 
 # commented out in favor of starting VS Code Insiders via Sperry / Set-ProcessState function
 # re-open Visual Studio code PowerShell extension examples
-# & code $env:USERPROFILE\.vscode\extensions\ms-vscode.PowerShell\examples
-
-Write-Output -InputObject 'Declaring function Open-Code'
-function Open-Code
-{
-<#
-    Potential enhancements, as examples of code.exe / code-insiders.exe parameters
-        --install-extension guosong.vscode-util --install-extension ms-vscode.PowerShell --install-extension Shan.code-settings-sync --install-extension wmaurer.change-case --install-extension DavidAnson.vscode-markdownlint
-        --install-extension LaurentTreguier.vscode-simple-icons --install-extension seanmcbreen.Spell --install-extension mohsen1.prettify-json --install-extension ms-vscode.Theme-MarkdownKit 
-
-    Visual Studio Code - Insiders 1.8.0-insider
-
-    Usage: code-insiders.exe [options] [paths...]
-
-    Options:
-    -d, --diff                  Open a diff editor. Requires to pass two file
-                                paths as arguments.
-    -g, --goto                  Open the file at path at the line and column (add
-                                :line[:column] to path).
-    --locale <locale>           The locale to use (e.g. en-US or zh-TW).
-    -n, --new-window            Force a new instance of Code.
-    -p, --performance           Start with the 'Developer: Startup Performance'
-                                command enabled.
-    -r, --reuse-window          Force opening a file or folder in the last active
-                                window.
-    --user-data-dir <dir>       Specifies the directory that user data is kept
-                                in, useful when running as root.
-    --verbose                   Print verbose output (implies --wait).
-    -w, --wait                  Wait for the window to be closed before
-                                returning.
-    --extensions-dir <dir>      Set the root path for extensions.
-    --list-extensions           List the installed extensions.
-    --show-versions             Show versions of installed extensions, when using
-                                --list-extension.
-    --install-extension <ext>   Installs an extension.
-    --uninstall-extension <ext> Uninstalls an extension.
-    --disable-extensions        Disable all installed extensions.
-    --disable-gpu               Disable GPU hardware acceleration.
-    -v, --version               Print version.
-    -h, --help                  Print usage.
-
-#>
-    param (
-        [Parameter(Position=0)]
-        [array]
-        $ArgumentList
-    )
-
-    Write-Debug -Message 'Start Code Insiders'
-    if ($ArgumentList)
-    {
-        # sanitize passed parameters
-        $ArgsArray = @()
-        foreach ($filePath in @($ArgumentList -split ','))
-        {
-            if (test-path -Path $filePath -PathType Leaf)
-            {
-                $ArgsArray += $filePath
-            }
-        }
-    }
-    Write-Debug -Message "& code-insiders.cmd $ArgsArray"
-    & 'C:\Program Files (x86)\Microsoft VS Code Insiders\bin\code-insiders.cmd' $ArgsArray
-}
-
-Write-Output -InputObject 'Declaring aliases and XenApp shortcut functions'
-# Setup PS aliases for launching common apps, including XenApp
-New-Alias -Name psedit -Value Open-Code -ErrorAction Ignore
 
 New-Alias -Name rdp -Value Start-RemoteDesktop -ErrorAction Ignore
 
