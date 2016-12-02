@@ -1,3 +1,8 @@
+# PowerShell Module files are Windows ASCii text files
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+
 # Auto detect text files and perform LF normalization
 * text=auto
 

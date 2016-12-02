@@ -15,7 +15,7 @@ Set-StrictMode -Version latest
 $logFileBase = $(Join-Path -Path "$([Environment]::GetFolderPath('MyDocuments'))" -ChildPath 'WindowsPowerShell\log')
 $logFilePrefix = $($MyInvocation.MyCommand.Name.Split('.'))[0]
 
-Write-Output -InputObject " Dot-Sourcing $($MyInvocation.MyCommand.Path)`n"
+Write-Verbose -Message " Dot-Sourcing $($MyInvocation.MyCommand.Path)`n"
 
 Write-Debug -Message "  ... logFileBase is $logFileBase\$logFilePrefix-[date].log"
 
@@ -30,7 +30,7 @@ Write-Debug -Message "  ... logFileBase is $logFileBase\$logFilePrefix-[date].lo
             throw "Failed to find $kdiff" | Tee-Object -FilePath $logFile -Append
         }
     }
-    Write-Output -InputObject "Will use diff tool: $kdiff"
+    Write-Verbose -Message "Will use diff tool: $kdiff"
 
     # Syntax we're going for: kdiff3 dir1 dir2 [dir3] -o destdir
     # for additional 'Help' info, browse: file:///C:/Program%20Files/KDiff3/doc/startingdirmerge.html
@@ -69,7 +69,7 @@ Write-Debug -Message "  ... logFileBase is $logFileBase\$logFilePrefix-[date].lo
     )
     # 'SkipDirStatus=1', -- removed due to error message
 
-Write-Output -InputObject "Declaring Function Merge-Repository"
+Write-Verbose -Message "Declaring Function Merge-Repository"
 function Merge-Repository
 {
 #region Setup
@@ -205,13 +205,20 @@ function Merge-Repository
         else
         {
             Write-Debug -Message 'No MergePath; 2-way merge'
-            Write-Debug -Message "$kdiff $SourcePath $TargetPath $kdArgs"
-
-            if ($PSCmdlet.ShouldProcess($SourcePath,$("Merge $SourcePath, $TargetPath"))) {
-                Write-Output -InputObject "Merging $SourcePath <-> $TargetPath" | Out-File -FilePath $logFile -Append
-                Start-Process -FilePath $kdiff -ArgumentList "$SourcePath $TargetPath $kdArgs" -Wait
-                # In a 2-way merge, with SyncMode=1 kdiff3 can sync both directories, so we can skip the copy/mirror-back activity of the 3-way merge above.
-            }
+# * * * RFE : Move file-hash comparison into a function, so it can handle folder hash comparison
+#            if ( -not [bool](Compare-Object -ReferenceObject (get-filehash -Path $SourcePath) (get-filehash -Path $TargetPath) -Property Hash))
+#            {
+                Write-Debug -Message "$kdiff $SourcePath $TargetPath $kdArgs"
+                if ($PSCmdlet.ShouldProcess($SourcePath,$("Merge $SourcePath, $TargetPath"))) {
+                    Write-Output -InputObject "Merging $SourcePath <-> $TargetPath" | Out-File -FilePath $logFile -Append
+                    Start-Process -FilePath $kdiff -ArgumentList "$SourcePath $TargetPath $kdArgs" -Wait
+                    # In a 2-way merge, with SyncMode=1 kdiff3 can sync both directories, so we can skip the copy/mirror-back activity of the 3-way merge above.
+                }
+#            }
+#            else
+#            {
+#                Write-Output -InputObject "File hashes match; no action needed." | Tee-Object -FilePath $logFile -Append
+#            }
         }
     #endregion
 
@@ -220,9 +227,10 @@ function Merge-Repository
     Write-Output -InputObject '' | Tee-Object -FilePath $logFile -Append
 }
 
-Write-Output -InputObject "Declaring Function Merge-MyPSFiles"
+Write-Verbose -Message "Declaring Function Merge-MyPSFiles"
 function Merge-MyPSFiles
 {
+[CmdletBinding(SupportsShouldProcess)]
     $logFile = $(Join-Path -Path $logFileBase -ChildPath "$logFilePrefix-$(Get-Date -UFormat '%Y%m%d').log")
     Write-Output -InputObject '' | Tee-Object -FilePath $logFile -Append
     Write-Output -InputObject "logging to $logFile"
@@ -246,12 +254,13 @@ function Merge-MyPSFiles
     #>
 
     # My own 'custom' modules
-    $MyModules = @('EditModule', 'ProfilePal', 'PSLogger', 'UpGuard')
-    # EXAMPLE   : PS .\> .\PowerDiff.ps1 -SourcePath .\Modules\ProfilePal -TargetPath ..\GitHub\ -MergePath 'H:\My Documents\WindowsPowerShell\Modules\'
+    $MyModules = @('EditModule', 'ProfilePal', 'PSLogger', 'Sperry') # UpGuard')
+    # EXAMPLE   : PS .\> .\PowerDiff.ps1 -SourcePath .\Modules\ProfilePal -TargetPath ..\GitHub\
     # Technically, per kdiff3 Help, the name of the directory-to-be-merged only needs to be specified once, when the all are the same, just at different root paths.
 
-    $MyHomeWPS = "\\hcdata\homes`$\gbci\$env:USERNAME\My Documents\WindowsPowerShell"
-    $MyHomeModuleBase = join-path -Path $MyHomeWPS -ChildPath 'Modules'
+    $myPShome = $(Join-Path -Path "$([Environment]::GetFolderPath('MyDocuments'))" -ChildPath 'WindowsPowerShell')
+    $myPShome = "\\hcdata\homes`$\gbci\$env:USERNAME\My Documents\WindowsPowerShell"
+    $MyHomeModuleBase = join-path -Path $myPShome -ChildPath 'Modules'
 
     # *** update design to be considerate of branch bandwidth when copying from local to H:, but optimize for performance when copying in NAS
     [bool]$onServer = $false
@@ -262,9 +271,9 @@ function Merge-MyPSFiles
 
     # if 'online' at work, then we merge 3 repos, including to target H: drive
 #region Merge at work
-    if (Test-Path -Path $MyHomeWPS)
+    if (Test-Path -Path $myPShome)
     {
-        Write-Output -InputObject "Detected work network with 'home' drive. Performing 3-way merges" | Tee-Object -FilePath $logFile -Append
+        Write-Output -InputObject "Detected work network with 'home' drive. Merge & syncronizing to shared repository" | Tee-Object -FilePath $logFile -Append
 
         foreach ($module in $3PModules)
         {
@@ -298,43 +307,52 @@ function Merge-MyPSFiles
         {
             Write-Output -InputObject "Merging $module" | Tee-Object -FilePath $logFile -Append
             $modFullPath = join-path -Path $MyHomeModuleBase -ChildPath $module
-            Merge-Repository -SourcePath "$((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase)" -TargetPath "$modFullPath" -MergePath \\hcdata\apps\IT\PowerShell-Modules\$module
-            Merge-Repository -SourcePath "$modFullPath" -TargetPath "$($modFullPath -replace $env:USERNAME,$($env:USERNAME+'2'))"
+            # first merge from 'admin' (2) workspace to primary $HOME
+            Write-Verbose -Message "Merge-Repository -SourcePath $($modFullPath -replace $env:USERNAME,$($env:USERNAME+'2')) -TargetPath $modFullPath" | Tee-Object -FilePath $logFile -Append
+            Merge-Repository -SourcePath "$($modFullPath -replace $env:USERNAME,$($env:USERNAME+'2'))" -TargetPath "$modFullPath" 
+            # then merge network $HOME workspace with local
+            Write-Verbose -Message "Merge-Repository -SourcePath $((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase) -TargetPath $modFullPath" | Tee-Object -FilePath $logFile -Append
+            Merge-Repository -SourcePath "$((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase)" -TargetPath "$modFullPath"
+            # -MergePath \\hcdata\apps\IT\PowerShell-Modules\$module
+            # then mirror back final $HOME workspace to 'admin' (2) workspace 
+            Write-Debug -Message "robocopy $modFullPath $($modFullPath -replace $env:USERNAME,$($env:USERNAME+'2')) /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$rclogFile"
+            Write-Output -InputObject "robocopy $modFullPath $($modFullPath -replace $env:USERNAME,$($env:USERNAME+'2')) /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$rclogFile" | Out-File -FilePath $logFile -Append
+            & robocopy.exe $modFullPath $($modFullPath -replace $env:USERNAME,$($env:USERNAME+'2')) /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$rclogFile
         }
 
         if ($onServer) {
-            # Merge / sync from $MyHomeWPS (share)  \scripts folder to '2' account share
-            Write-Output -InputObject 'Merging $MyHomeWPS\scripts folder' | Tee-Object -FilePath $logFile -Append
-            $adminHomeWPS = $MyHomeWPS -replace $env:USERNAME,$($env:USERNAME+'2')
-            Merge-Repository -SourcePath "$(Join-Path -Path $MyHomeWPS -ChildPath 'Scripts')" -TargetPath "$(Join-Path -Path $adminHomeWPS -ChildPath 'Scripts')"
+            # Merge / sync from $myPShome (share)  \scripts folder to '2' account share
+            Write-Output -InputObject 'Merging $myPShome\scripts folder' | Tee-Object -FilePath $logFile -Append
+            $adminHomeWPS = $myPShome -replace $env:USERNAME,$($env:USERNAME+'2')
+            Merge-Repository -SourcePath "$(Join-Path -Path $myPShome -ChildPath 'Scripts')" -TargetPath "$(Join-Path -Path $adminHomeWPS -ChildPath 'Scripts')"
 
             # While we're at it merge any other common PS files, like profile scripts
             if (Test-Path -Path $PROFILE.CurrentUserCurrentHost)
             {
                 Write-Output -InputObject 'Merging CurrentUserCurrentHost profile script' | Tee-Object -FilePath $logFile -Append
                 $Profile_Script = Split-Path -Path $PROFILE.CurrentUserCurrentHost -Leaf
-                Merge-Repository -SourcePath $PROFILE.CurrentUserCurrentHost -TargetPath "$MyHomeWPS\$Profile_Script" -MergePath "$adminHomeWPS\$Profile_Script"
+                Merge-Repository -SourcePath $PROFILE.CurrentUserCurrentHost -TargetPath "$myPShome\$Profile_Script" -MergePath "$adminHomeWPS\$Profile_Script"
             }
 
             if (Test-Path -Path $PROFILE.CurrentUserAllHosts)
             {
                 Write-Output -InputObject 'Merging CurrentUserAllHosts profile script' | Tee-Object -FilePath $logFile -Append
                 $Profile_Script = Split-Path -Path $PROFILE.CurrentUserCurrentHost -Leaf
-                Merge-Repository -SourcePath $PROFILE.CurrentUserAllHosts -TargetPath "$MyHomeWPS\$Profile_Script" -MergePath "$adminHomeWPS\$Profile_Script"
+                Merge-Repository -SourcePath $PROFILE.CurrentUserAllHosts -TargetPath "$myPShome\$Profile_Script" -MergePath "$adminHomeWPS\$Profile_Script"
             }
 
             if (Test-Path -Path $PROFILE.AllUsersCurrentHost)
             {
                 Write-Output -InputObject 'Merging AllUsersCurrentHost profile script' | Tee-Object -FilePath $logFile -Append
                 $Profile_Script = 'AllUsers_' + (Split-Path -Path $PROFILE.AllUsersCurrentHost -Leaf)
-                Merge-Repository -SourcePath $PROFILE.AllUsersCurrentHost -TargetPath "$MyHomeWPS\$Profile_Script" -MergePath "$adminHomeWPS\$Profile_Script"
+                Merge-Repository -SourcePath $PROFILE.AllUsersCurrentHost -TargetPath "$myPShome\$Profile_Script" -MergePath "$adminHomeWPS\$Profile_Script"
             }
 
             if (Test-Path -Path $PROFILE.AllUsersAllHosts)
             {
                 Write-Output -InputObject 'Merging AllUsersAllHosts profile script' | Tee-Object -FilePath $logFile -Append
                 $Profile_Script = 'AllUsers_' + (Split-Path -Path $PROFILE.AllUsersAllHosts -Leaf)
-                Merge-Repository -SourcePath $PROFILE.AllUsersAllHosts -TargetPath "$MyHomeWPS\$Profile_Script" -MergePath "$adminHomeWPS\$Profile_Script"
+                Merge-Repository -SourcePath $PROFILE.AllUsersAllHosts -TargetPath "$myPShome\$Profile_Script" -MergePath "$adminHomeWPS\$Profile_Script"
             }
         }
     }
@@ -369,8 +387,16 @@ function Merge-MyPSFiles
                 # Diff/Merge or copy the file
                 if (Test-Path -Path $ScriptTargetPath)
                 {
-                    Write-Output -InputObject "Merging $psfile profile script" | Tee-Object -FilePath $logFile -Append
-                    Merge-Repository -SourcePath $PROFILE.$psfile -TargetPath $ScriptTargetPath
+                    # Get file hashes and compare. If the hashes match, Compare-Object returns $false, so invert desired boolean using -not 
+                    if ( -not [bool](Compare-Object -ReferenceObject (get-filehash -Path $PROFILE.$psfile) (get-filehash -Path $ScriptTargetPath) -Property Hash))
+                    {
+                        Write-Output -InputObject "Merging $psfile profile script" | Tee-Object -FilePath $logFile -Append
+                        Merge-Repository -SourcePath $PROFILE.$psfile -TargetPath $ScriptTargetPath
+                    }
+                    else
+                    {
+                        Write-Output -InputObject "File hashes match; no action needed." | Tee-Object -FilePath $logFile -Append
+                    }
                 }
                 else
                 {
@@ -385,4 +411,7 @@ function Merge-MyPSFiles
     Write-Output -InputObject "`n$(Get-Date -Format g) # Ending $($MyInvocation.MyCommand.Name)" | Tee-Object -FilePath $logFile -Append
     # ======== THE END ======================
     Write-Output -InputObject '' | Tee-Object -FilePath $logFile -Append
+
+    # and then we open GitHub
+    Set-ProcessState -ProcessName github -Action Start
 }

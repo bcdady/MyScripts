@@ -1,4 +1,7 @@
 ﻿$ErrorActionPreference = 'Inquire'
+Write-Output -InputObject 'Dot-sourcing shortcut functions ...'
+
+Write-Output -InputObject 'Declaring function Get-Shortcut'
 function Get-Shortcut {
 <#
     .SYNOPSIS
@@ -35,7 +38,7 @@ function Get-Shortcut {
         AUTHOR      :  @bcdady
 #>
   param(
-        [Parameter(Mandatory = $false,
+        [Parameter(
             Position = 0,
             ValueFromPipeline = $true,
             HelpMessage = 'Folder path to look for .lnk shortcuts'
@@ -45,61 +48,83 @@ function Get-Shortcut {
         $path = "$Env:ProgramData\Microsoft\Windows\Start Menu\Programs" # $(Join-Path -Path $env:UserProfile -ChildPath 'Desktop')
   )
 
-  $obj = New-Object -ComObject WScript.Shell
+  $WSCShell = New-Object -ComObject WScript.Shell
 
 <#  if ($path -eq $null) {
     $pathUser = [System.Environment]::GetFolderPath('Desktop')
-    # $pathCommon = $obj.SpecialFolders.Item('AllUsersStartMenu')
+    # $pathCommon = $WSCShell.SpecialFolders.Item('AllUsersStartMenu')
     $path = Get-ChildItem $pathUser, $pathCommon -Filter *.lnk -Recurse 
   }
 #>
+    $Private:RetObject = New-Object -TypeName PSObject
+    $global:shortcuts = @()
 
-Get-ChildItem $path -Filter *.lnk | ForEach-Object -Process {
-    Write-Output -InputObject "debug: Getting SC info for $($PSItem.FullName)"
-      $link = $obj.CreateShortcut($PSItem.FullName)
+    Write-Debug -Message "Get-ChildItem $path -Filter *.lnk"
+    Get-ChildItem $path -Filter *.lnk -Recurse | ForEach-Object -Process {
+        Write-Debug -Message "Getting shortcut info for $($PSItem.FullName)"
+        $link = $WSCShell.CreateShortcut($PSItem.FullName)
 
-      $info = [ordered]@{}
-      $info.Name       = $PSItem.Name
-      $info.LinkPath   = $link.FullName
-      $info.TargetPath = $link.TargetPath
-      $info.Arguments  = $link.Arguments
-      $info.Target     = try { Split-Path $info.TargetPath -Leaf } catch { 'n/a'}
+        $linkArguments = ''
+        try 
+        {
+            Test-Path -Path $link.TargetPath -PathType Leaf | out-null
+            $linkTarget = Split-Path $link.TargetPath -Leaf
 
-      New-Object -TypeName PSObject -Property $info
+            if ($link.Arguments) { $linkArguments = $link.Arguments }
+            $private:properties = [ordered]@{
+                'Name'        = $($PSItem.Name  -replace "\s",'').Replace('.lnk','')
+                'Target'      = $linkTarget
+                'Arguments'   = $linkArguments
+                'Description' = $link.Description
+                'FullName'    = $link.FullName
+            }
+            #    'BaseName'    = $($link.FullName | Split-Path $link.TargetPath -Parent)
+
+            # Instantiate custom object with these properties
+            $Private:RetObject = New-Object -TypeName PSObject -Property $private:properties
+
+            # Append the current object instance to the collection of objects to be returned
+            $global:shortcuts += $Private:RetObject
+        }
+        catch
+        {
+            Write-Debug -Message "Skipping invalid shortcut -- Failed to validate TargetPath for $($PSItem.FullName)"
     }
 }
 
 # Get-Shortcut $env:UserProfile\Desktop; # | select-object -Property Link, Target, Arguments;
 # | Where-Object ($_.Target -eq 'pnagent.exe'); # | Format-Table -Property Link, Target, Arguments -AutoSize
-
-$Path = "$Env:ProgramData\Microsoft\Windows\Start Menu\Programs"
+    # $Path = "$Env:ProgramData\Microsoft\Windows\Start Menu\Programs"
 
 # Got all local shortcuts ... originally created to 'harvest' shortcuts from a XenApp / RDS server session.
-$global:shortcuts = @{} # new hash table
-Get-ChildItem -Path $Path -Recurse | 
+    <#$global:shortcuts = @{} # new hash table
+    Get-ChildItem -Path $Path -Filter *.lnk -Recurse | 
 foreach {
 #    Write-Output -InputObject " > $(Split-Path -Path $(Split-Path -Path $PSItem.FullName -Parent) -Leaf) : "
     Get-Shortcut -Path $PSItem.FullName | Sort-Object -Unique -Descending | 
     ForEach-Object -Process {
-#        if ($lnk.Target  ) { # -like '*.exe' ) {
             try {
                 $global:shortcuts += @{$PSItem.Target = $PSItem.LinkPath} # $shortcuts + 
+                Write-Debug -Message "Added shortcuts target: $($PSItem.Target) with LinkPath $($PSItem.LinkPath)" 
             }
             catch {
-                # Write-Output -InputObject "warning: duplicate shortcut target already defined`n$($PSItem.Target) : $($PSItem.LinkPath)"
+                Write-Debug -Message "Warning: Duplicate shortcut target or other unexpected issue with PSItem:`n$PSItem"
             }
     }
 }
-Write-Output -InputObject "Successfully mapped $($shortcuts.Count) shortcuts."
+    #>
+    Write-Output -InputObject "Successfully mapped $($global:shortcuts.Count) shortcuts."
+}
 
+Write-Output -InputObject 'Declaring function Start-Shortcut'
 function Start-Shortcut {
   param(
-        [Parameter(Mandatory = $false,
+        [Parameter(
             Position = 0,
             ValueFromPipeline = $true,
             HelpMessage = 'Folder path to look for .lnk shortcuts'
         )]
-        [ValidateScript({"$PSItem" -in $global:shortcuts.Keys})]
+        [ValidateScript({foreach ($key in $global:shortcuts.Name) { Write-Output ('Comparing {0}* with {1}' -f $key, $PSItem); if ($myApp -like "$PSItem*") { Write-Output -InputObject "$myApp matched $app"; return $true } }})]
         [string]
         $Name = 'SnippingTool'
   )
@@ -111,15 +136,14 @@ function Start-Shortcut {
 # Get-Shortcut $env:UserProfile\Desktop; # | select-object -Property Link, Target, Arguments;
 # | Where-Object ($_.Target -eq 'pnagent.exe'); # | Format-Table -Property Link, Target, Arguments -AutoSize
 
+Write-Output -InputObject 'Declaring function Show-Shortcut'
 function Show-Shortcut {
   param(
         [Parameter(
-            Mandatory = $false,
             Position = 0,
             ValueFromPipeline = $true,
             HelpMessage = 'Folder path to look for .lnk shortcuts'
         )]
-        [ValidateScript({"$PSItem" -in $global:shortcuts.Keys})]
         [string]
         $Key = 'SnippingTool',
 
@@ -130,16 +154,16 @@ function Show-Shortcut {
         [switch]
         $All = $false
   )
+#    [ValidateScript({$global:shortcuts.Name -in "$PSItem*"})]
 
 if ($All) {
-    foreach ($sc in $($global:shortcuts.Keys |  Sort-Object -Property Values)) {
+    foreach ($sc in $($global:shortcuts.Name |  Sort-Object -Property Values)) {
         $showPath = $global:shortcuts.$sc -replace 'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\'
         $props = @{
             ShortcutName = $sc.Name
             LinkTarget = $showPath
         }
         New-Object -TypeName psobject -Property $props
-#        Write-Output -InputObject "$showPath `n`t$sc`n"
     }
 
   } else {
@@ -149,6 +173,5 @@ if ($All) {
             LinkTarget = $showPath
         }
         New-Object -TypeName psobject -Property $props
-#        Write-Output -InputObject "$showPath `n`t$sc`n"
   }
 }
