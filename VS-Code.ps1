@@ -69,9 +69,9 @@ function Open-Code
         }
     }
     Write-Debug -Message "& code-insiders.cmd $ArgsArray"
-    Start-Process -PassThru -NoNewWindow -FilePath "${env:ProgramFiles(x86)}\Microsoft VS Code Insiders\bin\code-insiders.cmd" -ArgumentList $ArgsArray
+    Start-Process -NoNewWindow -FilePath "${env:ProgramFiles(x86)}\Microsoft VS Code Insiders\bin\code-insiders.cmd" -ArgumentList $ArgsArray
 #    & "${env:CommonProgramFiles(x86)}\Microsoft VS Code Insiders\bin\code-insiders.cmd" $ArgsArray
 }
 
 # Setup PS aliases for launching common apps, including XenApp
-New-Alias -Name psedit -Value Open-Code -PassThru -ErrorAction Ignore
+New-Alias -Name psedit -Value Open-Code -ErrorAction Ignore
