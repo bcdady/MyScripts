@@ -2,7 +2,7 @@
 #Requires -Version 3
 # PowerShell $Profile
 # Originally created by New-Profile cmdlet in ProfilePal Module; modified for ps-core compatibility (use on Mac) by @bcdady 2016-09-27
-# ~/.config/powershell/Microsoft.PowerShell_profile.ps1    
+# ~/.config/powershell/Microsoft.PowerShell_profile.ps1
 
 # $Script:startingPath = $pwd
 Write-Output -InputObject "`n`tLoading PowerShell `$Profile: CurrentUserCurrentHost`n"
@@ -123,7 +123,8 @@ if ($IsWindows)
 }
 else
 {
-  # Need to determine / test how to propertly do this on non-windows OS  
+  # Need to determine / test how to propertly do this on non-windows OS
+  $myPShome = $HOME
 }
 
 #Write-Verbose -Message "PowerShell profile root (`$myPShome) is:  $myPShome"
@@ -373,17 +374,21 @@ function Update-UAC
     $UACpref = '5'
   )
 
-  # Check current UAC level via registry
-  # We want ConsentPromptBehaviorAdmin = 5
-  # thanks to http://forum.sysinternals.com/display-uac-status_topic18490_page3.html
-  if (((get-itemproperty -path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -name 'ConsentPromptBehaviorAdmin').ConsentPromptBehaviorAdmin) -ne $UACpref)
+  if ($IsWindows)
   {
-    # prompt for UAC update
-    Write-Verbose -Message 'Opening User Account Control Settings dialog'
-    & UserAccountControlSettings.exe
+    # Check current UAC level via registry
+    # We want ConsentPromptBehaviorAdmin = 5
+    # thanks to http://forum.sysinternals.com/display-uac-status_topic18490_page3.html
+    if (((get-itemproperty -path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -name 'ConsentPromptBehaviorAdmin').ConsentPromptBehaviorAdmin) -ne $UACpref)
+    {
+      # prompt for UAC update
+      Write-Verbose -Message 'Opening User Account Control Settings dialog'
+      & UserAccountControlSettings.exe
+    }
+    
+    Write-Verbose -Message "UAC level is $((get-itemproperty -path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -name 'ConsentPromptBehaviorAdmin').ConsentPromptBehaviorAdmin)"
+    
   }
-  
-  Write-Verbose -Message "UAC level is $((get-itemproperty -path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -name 'ConsentPromptBehaviorAdmin').ConsentPromptBehaviorAdmin)"
 }
 
 function Save-Credential
@@ -396,7 +401,7 @@ function Save-Credential
     ,
     [Parameter(Position = 1)]
     [string]
-    $USERNAME = $env:USERNAME
+    $USERNAME = $(if($IsWindows){$env:USERNAME}else{$env:USER})
   )
 
   if ([bool](Get-Variable -Name $Variable -ErrorAction SilentlyContinue | Out-Null))
