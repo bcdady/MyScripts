@@ -56,16 +56,27 @@ if ($IsWindows) { $hostOS = 'Windows' }
 if ($IsLinux)   { $hostOS = 'Linux' } 
 if ($IsOSX)     { $hostOS = 'OSX' }
 
+#write-output "`n ** To view additional available modules, run: Get-Module -ListAvailable"
+#write-output "`n ** To view cmdlets available in a given module, run: Get-Command -Module <ModuleName>"
 Write-Output -InputObject '' 
 Write-Output -InputObject " # $ShellId $($Host.version.tostring().substring(0,3)) $PSEdition on $hostOS #"
 
 Write-Verbose -Message "Setting environment HostOS to $hostOS"
 $env:HostOS = $hostOS
 
-Get-Variable -Name Is* -Exclude ISERecent
+Get-Variable -Name Is* -Exclude ISERecent | Format-Table -AutoSize
+<#
+Name                           Value
+----                           -----
+IsCoreCLR                      True
+IsLinux                        False
+IsOSX                          True
+IsWindows                      False
+#>
 
 Write-Output -InputObject "Running on $((Get-CimInstance -ClassName Win32_OperatingSystem -Property Caption).Caption) OS: $env:COMPUTERNAME"
 
+# Display execution policy, for convenience
 Write-Output -InputObject "`nCurrent PS execution policy is: "
 Get-ExecutionPolicy -List | Format-Table -AutoSize
 
