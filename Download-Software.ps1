@@ -3,17 +3,36 @@
 # RFE :: Can this be cross-platform, in PS-Core?
 
 $destinationDir = Join-Path -Path $HOME -ChildPath 'Downloads' -ErrorAction Stop
-$webclient = New-Object System.Net.WebClient
 
-# Make this a repeatable function  / looping call
-$software = @{
-    'GitHubSetup.exe'               = 'https://github-windows.s3.amazonaws.com/GitHubSetup.exe'
-    'VSCodeSetup-stable.exe'        = 'https://go.microsoft.com/fwlink/?LinkID=623230'
-    'VSCodeSetup-insider.exe'       = 'https://go.microsoft.com/fwlink/?LinkId=723965'
-    'BraveSetup-x64.exe'            = 'https://laptop-updates.brave.com/latest/winx64'
-    'KDiff3-64bit-Setup_latest.exe' = 'http://downloads.sourceforge.net/project/kdiff3/kdiff3/0.9.98/KDiff3-64bit-Setup_0.9.98-2.exe?r=https%3A%2F%2Fsourceforge.net%2Fprojects%2Fkdiff3%2Ffiles%2Fkdiff3%2F&ts=1477252886&use_mirror=heanet'
+Function Initialize-PackageSettings
+{
+    [CmdletBinding(SupportsShouldProcess)]
+    param (
+        # Parameter help description
+        [Parameter(
+            Mandatory,
+            Position=0
+        )]
+        [Alias('FileName','json')]
+        [String]
+        $Name = 'bootstrap.json'
+    )    
+    Write-Debug -Message "`$script:Settings = (Get-Content -Path $(join-path -Path $(Split-Path -Path $((Get-PSCallStack).ScriptName | Sort-Object -Unique) -Parent) -ChildPath $Name)) -join ""``n"" | ConvertFrom-Json"
+    $PackageSettingsPath = $(join-path -Path $(Split-Path -Path $PSCommandPath -Parent) -ChildPath $Name)
+    try {
+        $script:Settings = (Get-Content -Path $PackageSettingsPath) -join "`n" | ConvertFrom-Json
+        Write-Verbose -Message 'Settings imported. Run Show-Settings to see details.' 
+    }
+    catch {
+        throw "Critical Error loading settings from from $PackageSettingsPath"
+    }
 }
-#     'KDiff3-64bit-Setup_latest.exe' = 'https://sourceforge.net/projects/kdiff3/files/latest/download?source=files'
+
+$script:packages = @{}
+$script:Settings | ForEach-Object {
+    Write-Debug -Message "$($PSItem.Name) = $($ExecutionContext.InvokeCommand.ExpandString($PSItem.Path))"
+    $script:knownPaths.Add("$($PSItem.Name)",$ExecutionContext.InvokeCommand.ExpandString($PSItem.Path))
+}
 
 foreach ($download in $software.Keys) {
     $uri = $software.$download

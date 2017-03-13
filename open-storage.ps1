@@ -11,18 +11,18 @@ if ( -not (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIde
 
 if ((Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\StorageDevicePolicies).WriteProtect -eq 1)
 {
-    Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\StorageDevicePolicies -Name WriteProtect -Value 0 -Force
+    Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\StorageDevicePolicies -Name WriteProtect -Value 0 -Force -PassThru
 }
 
 if ((Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\Storage).Deny_Execute -eq 1)
 {
-    Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\Storage -Name Deny_Execute -Value 0 -Force
+    Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\Storage -Name Deny_Execute -Value 0 -Force -PassThru
 }
 
-Get-ItemProperty -Path HKLM:\SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices\* -Name Deny_Write | foreach {
+Get-ItemProperty -Path HKLM:\SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices\* -Name Deny_Write | ForEach-Object {
     if ($PSItem.Deny_Write -eq 1)
     {
-        Set-ItemProperty -Path $PSItem.PSPath -Name Deny_Write -Value 0 -Force
+        Set-ItemProperty -Path $PSItem.PSPath -Name Deny_Write -Value 0 -Force -PassThru
     }
  }
 
