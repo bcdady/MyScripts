@@ -351,11 +351,11 @@ function Merge-MyPSFiles
             try
             {
                 $script:rcSource = """$((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase)"""
-                Write-Verbose -Message "Updating $module (from $script:rcSource to $script:rcTarget with Robocopy)" | Tee-Object -FilePath $script:logFile -Append
+                Write-Output -InputObject "Updating $module (from $script:rcSource to $script:rcTarget with Robocopy)" | Tee-Object -FilePath $script:logFile -Append
             }
             catch
             {
-                Write-Verbose -Message "Failed to read Module's directory property (ModuleBase)"
+                Write-Warning -Message "Failed to read Module's directory property (ModuleBase)"
                 break
             }
 
@@ -458,11 +458,13 @@ function Merge-MyPSFiles
         }
 
         # Merge PowerShell\Scripts folder with ..\GitHub\MyScripts local repo
-        # $script:ghMyScripts = Join-Path -Path $(Split-Path -Path $myPShome -Parent) -ChildPath 'GitHub\MyScripts'
+        $script:ghMyScripts = Join-Path -Path $(Split-Path -Path $myPShome -Parent) -ChildPath 'GitHub\MyScripts'
         $script:PSScripts = Join-Path -Path $myPShome -ChildPath 'Scripts'
-        Merge-Repository -SourcePath $script:PSScripts -TargetPath "$(Join-Path -Path $(Split-Path -Path $myPShome -Parent) -ChildPath 'GitHub\MyScripts')"
+        Merge-Repository -SourcePath $script:PSScripts -TargetPath $script:ghMyScripts
 
-        if (Test-Path -Path 'H:\My Documents\WindowsPowerShell' -ErrorAction SilentlyContinue)
+        $PShome = 'H:\My Documents\WindowsPowerShell'
+
+        if (Test-Path -Path $PShome -ErrorAction SilentlyContinue)
         {
 
             Write-Output -InputObject 'Performing $HOME (2-way) merges' | Tee-Object -FilePath $script:logFile -Append
@@ -470,12 +472,16 @@ function Merge-MyPSFiles
             foreach ($module in $MyModules)
             {
                 Write-Output -InputObject "Merging $module (locally)" | Tee-Object -FilePath $script:logFile -Append
-                Merge-Repository -SourcePath $((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase) -TargetPath (Join-Path -Path 'H:\My Documents\WindowsPowerShell' -ChildPath 'Modules')
+                Merge-Repository -SourcePath $((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase) -TargetPath (Join-Path -Path $PShome -ChildPath "Modules\$module")
             }
 
             # Merge local PowerShell\Scripts folder with $HOME\PowerShell\Scripts folder
             # $script:ghMyScripts = Join-Path -Path $(Split-Path -Path $myPShome -Parent) -ChildPath 'GitHub\MyScripts'
-            Merge-Repository -SourcePath $script:PSScripts -TargetPath 'H:\My Documents\WindowsPowerShell\Scripts'
+            Merge-Repository -SourcePath $script:PSScripts -TargetPath (Join-Path -Path $PShome -ChildPath 'Scripts')
+        }
+        else
+        {
+            Write-Warning -Message "Failed to locate mapped path $PShome. Try re-running Mount-Path function."
         }
         
         # While we're at it merge primary profile script
