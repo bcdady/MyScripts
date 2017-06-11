@@ -419,7 +419,7 @@ Write-Verbose -Message 'Archive PowerShell logs'
 Backup-Logs
 
 # if connected to work network, initiate logging on to work, via Set-Workplace function
-if ($atWork)
+if (($atWork) -and ((Get-Date -DisplayHint Time).Hour -ge 6) -and ((Get-Date -DisplayHint Time).Hour -le 19))
 {
   # Save-Credential
   Set-Workplace -Zone Office

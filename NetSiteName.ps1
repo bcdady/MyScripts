@@ -75,7 +75,7 @@ function Get-NetSite
             }
             ^192\.168\.\d+
             {
-                $Private:SiteName = 'Private NAT (home?)'
+                $Private:SiteName = 'Private NAT'
                 break
             }
             Default

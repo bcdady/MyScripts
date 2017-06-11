@@ -8,19 +8,9 @@
 [cmdletbinding(SupportsShouldProcess)]
 Param()
 
-write-output -inputobject 'Loading functions from GBCI-XenApp.ps1' -verbose
+write-output -InputObject 'Loading functions from GBCI-XenApp.ps1' -verbose
 
-function Stop-Sophos
-{
-  Set-ServiceGroup -ServiceName 'sophos client*' -Status Stopped
-}
-
-function Start-Sophos
-{
-  Set-ServiceGroup -ServiceName 'sophos client*' -Status Running
-}
-
-function logon-work
+function Logon-Work
 {
   Write-Output -InputObject 'Set-Workplace -zone Office'
   Set-ServiceGroup -ServiceName 'sophos client*' -Status Running
@@ -29,7 +19,7 @@ function logon-work
 
 New-Alias -Name start-work -Value logon-work -ErrorAction SilentlyContinue
 
-function logoff-work
+function Logoff-Work
 {
   Write-Output -InputObject 'Set-Workplace -zone Remote'
   Set-ServiceGroup -ServiceName 'sophos client*' -Status Stopped
@@ -40,62 +30,86 @@ New-Alias -Name stop-work -Value logoff-work -ErrorAction SilentlyContinue
 
 function open-workfront
 {
-  Write-Output -InputObject 'https://glacierbancorp.my.workfront.com/myWork'
-  Start-Process -FilePath 'https://glacierbancorp.my.workfront.com/myWork'
+  if ($Global:onServer)
+  {
+    #Write-Output -InputObject 'https://glacierbancorp.my.workfront.com/myWork'
+    #Start-Process -FilePath 'https://glacierbancorp.my.workfront.com/myWork'
+    Write-Output -InputObject 'Open Infrastructure Tactical Status Dashboard in Workfront'
+    Start-Process -FilePath 'https://glacierbancorp.my.workfront.com/dashboard/view?ID=58bf1adf0033326baa80cd030c403397'
+
+<#    Write-Output -InputObject 'Open Workfront Training'
+    #Start-Process -FilePath 'https://support.workfront.com/hc/en-us/articles/230791047?flash_digest=6bde06cf5b5f875b78fb38f7aba34a24533971ab#Workfront'
+    Start-Process -FilePath explorer.exe -ArgumentList 'S:\Everyone\Workfront Training'
+#>
+  }
 }
+
+<#
+  Available XenApp shortcuts as of 2017-05-31:
+  H Drive
+  XenApp 6 Farm
+  Assyst
+  Microsoft OneNote 2010
+  Microsoft Excel 2010
+  Remote Desktop Connection
+  Firefox
+  Citrix Director
+  Internet Explorer
+  Microsoft Visio 2010
+  Microsoft Word 2010
+  S Drive
+  ThinPrint Self Service
+  Adobe Reader XI
+  IT Service Center
+  UltiPro
+  Microsoft Outlook 2010
+  Skype for Business
+#>
 
 function xa_assyst
 {
-  if ($onServer) 
+  if ($Global:onServer)
   {
     #Write-Output -InputObject 'https://assystweb/assystweb'
     #Start-Process -FilePath 'https://assystweb/assystweb'
     # New URL for SP7 Jan '17: https://gbci02aweb1/assystweb/application.do#eventsearch%2FEventSearchDelegatingDispatchAction.do%3Fdispatch%3DloadQuery%26showInMonitor%3Dtrue%26context%3Dselect%26queryProfileForm.columnProfileId%3D371%26queryProfileForm.queryProfileId%3D1216
     Write-Output -InputObject 'https://gbci02aweb1/assystweb/'
     Start-Process -FilePath 'https://gbci02aweb1/assystweb/'
-  }
-  else
-  {
+  } else {
     # locally, via Receiver ...
     Write-Output -InputObject 'Start-XenApp -Qlaunch assyst'
-    Start-XenApp -Qlaunch assyst
+    Start-XenApp -Qlaunch Assyst
   }
 }
+
 function xa_cmd
 {
   # Start Command Line
-  if ($onServer) 
-  {
+  if ($Global:onServer) {
     Write-Output -InputObject '& cmd.exe'
     & cmd.exe
-  }
-  else
-  {
+  } else {
     # locally, via Receiver ...
     Write-Output -InputObject 'Start-XenApp -Qlaunch cmd'
     Start-XenApp -Qlaunch cmd
   }
 }
-function xa_excel
-{
-  if ($onServer) 
-  {
+
+function xa_excel {
+  if ($Global:onServer) {
     Write-Output -InputObject 'Microsoft Excel 2010.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Microsoft Office\Microsoft Excel 2010.lnk"
-  }
-  else
-  {
+  } else {
     # locally, via Receiver ...
     Write-Output -InputObject 'Start-XenApp -Qlaunch Excel'
-    Start-XenApp -Qlaunch excel
+    Start-XenApp -Qlaunch 'Microsoft Excel 2010'
   }
 }
 
 Set-Alias -Name xa_xl -Value xa_excel
 
-function xa_hdrive
-{
-  if ($onServer) 
+function xa_hdrive {
+  if ($Global:onServer)
   {
     Write-Output -InputObject 'explorer.exe H:\'
     & explorer.exe 'H:\'
@@ -103,8 +117,8 @@ function xa_hdrive
   else
   {
     # locally, via Receiver ...
-    Write-Output -InputObject 'Start-XenApp -Qlaunch h_drive'
-    Start-XenApp -Qlaunch h_drive
+    Write-Output -InputObject 'Start-XenApp -Qlaunch "H Drive"'
+    Start-XenApp -Qlaunch 'H Drive'
   }
 }
 
@@ -113,7 +127,7 @@ Set-Alias -Name xa_h -Value xa_hdrive
 
 function xa_IE
 {
-  if ($onServer) 
+  if ($Global:onServer)
   {
     Write-Output -InputObject 'https://intranet2'
     Start-Process -FilePath 'https://intranet2'
@@ -121,152 +135,106 @@ function xa_IE
   else
   {
     # locally, via Receiver ...
-    Write-Output -InputObject 'Start-XenApp -Qlaunch IE'
-    Start-XenApp -Qlaunch IE
+    Write-Output -InputObject 'Start-XenApp -Qlaunch "Internet Explorer"'
+    Start-XenApp -Qlaunch 'Internet Explorer'
   }
 }
 
 Set-Alias -Name xa_intranet -Value xa_ie
 Set-Alias -Name xa_browser -Value xa_ie
 
-
-function xa_itsc
-{
-  if ($onServer) 
-  {
+function xa_itsc {
+  if ($Global:onServer) {
     #    Write-Output -InputObject 'https://itsc/assystnet/'
     #    Start-Process -FilePath 'https://itsc/assystnet/'
     # New URL for SP7 Jan '17: https://gbci02itsc1/assystnet/application/assystNET.jsp#id=-1;;type=2
     Write-Output -InputObject 'https://gbci02itsc1/assystnet/'
     Start-Process -FilePath 'https://gbci02itsc1/assystnet/application/assystNET.jsp#id=-1;;type=2'
-  }
-  else
-  {
+  } else {
     # locally, via Receiver ...
-    Write-Output -InputObject 'Start-XenApp -Qlaunch itsc'
-    Start-XenApp -Qlaunch itsc
+    Write-Output -InputObject 'Start-XenApp -Qlaunch "IT Service Center"'
+    Start-XenApp -Qlaunch 'IT Service Center'
   }
 }
 
-function xa_firefox
-{
+function xa_firefox {
   Write-Output -InputObject 'Start-XenApp -Qlaunch Firefox'
   Start-XenApp -Qlaunch FireFox
 }
-function xa_mstsc
-{
-  if ($onServer) 
+
+function xa_mstsc {
+  if ($Global:onServer)
   {
     Write-Output -InputObject 'Start-RemoteDesktop'
     Start-RemoteDesktop
-  }
-  else
-  {
+  } else {
     Write-Output -InputObject 'Start-XenApp -Qlaunch mstsc'
-    Start-XenApp -Qlaunch mstsc
+    Start-XenApp -Qlaunch 'Remote Desktop Connection'
   }
 }
 Set-Alias -Name xa_rdp -Value xa_mstsc
 
-function xa_onenote 
-{
-  if ($onServer) 
-  {
+function xa_onenote {
+  if ($Global:onServer) {
     Write-Output -InputObject 'Microsoft OneNote 2010.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Microsoft Office\Microsoft OneNote 2010.lnk"
-  }
-  else
-  {
-    Write-Output -InputObject 'Start-XenApp -Qlaunch onenote'
-    Start-XenApp -Qlaunch onenote 
+  } else {
+    Write-Output -InputObject 'Start-XenApp -Qlaunch OneNote'
+    Start-XenApp -Qlaunch 'Microsoft OneNote 2010'
   }
 }
-function xa_outlook
-{
-  if ($onServer) 
-  {
+
+function xa_outlook {
+  if ($Global:onServer) {
     Write-Output -InputObject 'Microsoft Outlook 2010.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Microsoft Office\Microsoft Outlook 2010.lnk"
-  }
-  else
-  {
+  } else {
     Write-Output -InputObject 'Start-XenApp -Qlaunch outlook'
-    Start-XenApp -Qlaunch outlook 
+    Start-XenApp -Qlaunch 'Microsoft Outlook 2010'
   }
 }
 
 Set-Alias -Name xa_mail -Value xa_outlook
 Set-Alias -Name xa_olk -Value xa_outlook
 
-function xa_powerpoint
-{
-  if ($onServer) 
-  {
+function xa_powerpoint {
+  if ($Global:onServer) {
     Write-Output -InputObject 'Microsoft PowerPoint 2010.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Microsoft Office\Microsoft PowerPoint 2010.lnk"
-  }
-  else
-  {
+  } else {
     Write-Output -InputObject 'Start-XenApp -Qlaunch powerpoint'
-    Start-XenApp -Qlaunch powerpoint 
+    Start-XenApp -Qlaunch 'Microsoft Powerpoint 2010' 
   }
 }
 Set-Alias -Name xa_ppt -Value xa_powerpoint
 
-function xa_sdrive
-{
-  if ($onServer) 
-  {
+function xa_sdrive {
+  if ($Global:onServer) {
     Write-Output -InputObject 'explorer.exe S:\'
     & explorer.exe 'S:\'
-  }
-  else
-  {
-    Write-Output -InputObject 'Start-XenApp -Qlaunch s_drive'
-    Start-XenApp -Qlaunch s_drive
+  } else {
+    Write-Output -InputObject 'Start-XenApp -Qlaunch "S Drive"'
+    Start-XenApp -Qlaunch 'S Drive'
   }
 }
 Set-Alias -Name xa_s -Value xa_sdrive
 
-function xa_skype
-{
-  if ($onServer) 
-  {
+function xa_skype {
+  if ($Global:onServer) {
     Write-Output -InputObject 'Skype for Business 2015.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Microsoft Office 2013\Skype for Business 2015.lnk"
-  }
-  else
-  {
-    Write-Output -InputObject 'Start-XenApp -Qlaunch ''Skype for Business'''
+  } else {
+    Write-Output -InputObject 'Start-XenApp -Qlaunch "Skype for Business"'
     Start-XenApp -Qlaunch 'Skype for Business'
   }
 }
 Set-Alias -Name xa_s4b -Value xa_skype
 
-<#
-    PS .\> ls 'C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Synergy ECM\'
-
-
-    Directory: C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Synergy ECM
-
-
-    Mode                LastWriteTime     Length Name
-    ----                -------------     ------ ----
-    -a---         7/18/2015  11:49 PM       1126 Synergy Administration.lnk
-    -a---         7/18/2015  11:47 PM       1120 Synergy Capture Client.lnk
-    -a---         7/18/2015  11:47 PM       1109 Synergy Desktop Manager.lnk
-    -a---         2/12/2016  10:48 AM       1105 Synergy User Client.lnk
-#>
-
-function xa_synergy
-{
-  if ($onServer) 
-  {
+function xa_synergy {
+  if ($Global:onServer) {
     Write-Output -InputObject 'Synergy Desktop Manager.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Synergy ECM\Synergy Desktop Manager.lnk"
-  }
-  else
-  {
+  } else {
     # Qlaunch via Receiver
     Write-Output -InputObject 'Start-XenApp -Qlaunch synergy'
     Start-XenApp -Qlaunch synergy 
@@ -275,7 +243,7 @@ function xa_synergy
 
 function xa_synergy_admin
 {
-  if ($onServer) 
+  if ($Global:onServer)
   {
     Write-Output -InputObject 'Synergy Administration.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Synergy ECM\Synergy Administration.lnk"
@@ -290,7 +258,7 @@ function xa_synergy_admin
 
 function xa_visio
 {
-  if ($onServer) 
+  if ($Global:onServer)
   {
     Write-Output -InputObject 'Microsoft Visio 2010.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Microsoft Office\Microsoft Visio 2010.lnk"
@@ -303,7 +271,7 @@ function xa_visio
 }
 function xa_word
 {
-  if ($onServer)
+  if ($Global:onServer)
   {
     Write-Output -InputObject 'Microsoft Word 2010.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Microsoft Office\Microsoft Word 2010.lnk"
@@ -316,7 +284,7 @@ function xa_word
 }
 function xa_adobe 
 {
-  if ($onServer) 
+  if ($Global:onServer)
   {
     Write-Output -InputObject 'Adobe Reader XI.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Adobe Reader XI.lnk"
@@ -351,23 +319,26 @@ function xa_restart
 
 function Start-MyXenApps
 {
-  [cmdletbinding(SupportsShouldProcess)]
+  [cmdletbinding()]
   Param()
 
   # RFE: run this in the background?
-  Write-Verbose -Message 'Starting Skype for Business'
+  Write-Output -InputObject 'Starting Skype for Business'
   xa_skype
-  Start-Sleep -Seconds 5
-  Write-Verbose -Message 'Starting OneNote'
+  Start-Sleep -Seconds 6
+  Write-Output -InputObject"Setting GC92IT250 as default printer "
+  # Set-Printer -printerShareName GC92IT250
+  set-printer -printerShareName 'GC92IT250_(Grayscale)'
+  Start-Sleep -Milliseconds 250
+  get-printer -Default
+  Start-Sleep -Seconds 1
+  Write-Output -InputObject 'Starting OneNote'
   xa_onenote
   Start-Sleep -Seconds 5
-  Write-Verbose -Message 'Starting H Drive'
-  xa_h
-  Start-Sleep -Seconds 2
-  Write-Verbose -Message 'Starting Outlook'
+  Write-Output -InputObject 'Starting Outlook'
   xa_outlook
-  Start-Sleep -Seconds 5
-  Write-Verbose -Message 'Opening Assyst, ITSC, and Workfront (in default browser)'
+  Start-Sleep -Seconds 3
+  Write-Output -InputObject 'Opening Assyst, ITSC, and Workfront (in default browser)'
   xa_itsc
   Start-Sleep -Seconds 1
   xa_assyst
@@ -378,7 +349,7 @@ function Start-MyXenApps
 Write-Verbose -Message 'Checking if work apps should be auto-started'
 $thisHour = (Get-Date -DisplayHint Time).Hour
 Write-Debug -Message "(-not [bool](Get-ProcessByUser -ProcessName 'outlook.exe'))"
-if (($thisHour -ge 6) -and ($thisHour -le 18) -and ($onServer) -and (-not [bool](Get-ProcessByUser -ProcessName 'outlook.exe')))
+if (($thisHour -ge 6) -and ($thisHour -le 18) -and ($Global:onServer) -and (-not [bool](Get-ProcessByUser -ProcessName 'outlook.exe')))
 {
   Write-output -InputObject ' # Default Printer # :'
   Get-Printer -Default

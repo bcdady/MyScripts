@@ -52,18 +52,26 @@ $Private:properties = [ordered]@{
     'RemotingCapability' = $RemotingCapability
     'Visibility'         = $Visibility
 }
-$MyScriptInfo = $Private:RetObject = New-Object -TypeName PSObject -Prop $properties
-Write-Output -InputObject 'Declaring new object $MyScriptInfo'
+$MyScriptInfo = New-Object -TypeName PSObject -Prop $properties
+Write-Verbose -Message '[PowerDiff] Populating $MyScriptInfo'
 
 #Derive $logBase from script name. The most reliable automatic variable for this is $MyInvocation.MyCommand.Name
 # But the value of this variable changes within Functions, so we define a shared logging base from the 'parent' script file (name) level
 # all logging cmdlets later throughout this script should derive their logging path from this $logBase directory, by appending simply .log, or preferable [date].log
-if (-not [bool](Get-Variable -Name myPShome -Scope Global -ErrorAction Ignore))
+if (-not [bool](Get-Variable -Name myPSHome -Scope Global -ErrorAction Ignore))
 {
-    $script:myPShome = $(Join-Path -Path "$([Environment]::GetFolderPath('MyDocuments'))" -ChildPath 'WindowsPowerShell')
+    $script:myPSHome = $(Join-Path -Path "$([Environment]::GetFolderPath('MyDocuments'))" -ChildPath 'WindowsPowerShell')
 }
 
-$script:logFileBase = $(Join-Path -Path $myPShome -ChildPath 'log')
+if ($myPSHome -match "$env:SystemDrive") {
+    $script:localPSHome = $myPSHome
+}
+
+if ($env:HOMEDRIVE -ne $env:SystemDrive) {
+    $script:netPSHome = Join-Path -Path 'H:\' -ChildPath '*\WindowsPowerShell' -Resolve
+}
+
+$script:logFileBase = $(Join-Path -Path $myPSHome -ChildPath 'log')
 $script:logFilePrefix = $($MyScriptInfo.CommandName.Split('.'))[0]
 
 Write-Verbose -Message " Dot-Sourcing $CommandPath"
@@ -156,10 +164,10 @@ function Merge-Repository
         [array]
         $Filter
     )
-#region Setup
+    #region Setup
     $error.clear()
-    $erroractionpreference = 'Stop' # throw statement requires 'Stop'
-    # DEBUG MODE : $erroractionpreference = "Inquire"; "`$error = $error[0]"
+    $ErrorActionPreference = 'Stop' # throw statement requires 'Stop'
+    # DEBUG MODE : $ErrorActionPreference = "Inquire"; "`$error = $error[0]"
 
     # ======== BEGIN ====================
 
@@ -168,7 +176,7 @@ function Merge-Repository
     Write-Output -InputObject '' | Tee-Object -FilePath $script:logFile -Append
     Write-Verbose -Message "Logging to $script:logFile" # | Tee-Object -FilePath $script:logFile -Append
 
-    $script:rclogFile = $(Join-Path -Path $script:logFileBase -ChildPath "$script:logFilePrefix-robocopy-$(Get-Date -UFormat '%Y%m%d').log")
+    $script:RCLogFile = $(Join-Path -Path $script:logFileBase -ChildPath "$script:logFilePrefix-robocopy-$(Get-Date -UFormat '%Y%m%d').log")
 
     Write-Verbose -Message "$(Get-Date -Format g) # Starting Merge-Repository -file1 $file1 -file2 $file2 -file3 $file3" | Tee-Object -FilePath $script:logFile -Append
 
@@ -178,14 +186,14 @@ function Merge-Repository
     {
         $script:kdArgs = $script:kdArgs -replace 'RecursiveDirs=0','RecursiveDirs=1'
     }
-<# RFE
+    <# RFE
     # enhance Parameter support to enable selective control of Recursion and File filtering
     if ($Filter)
     {
         if ($script:kdiffConfig -like "*$Filter*" -notin $PSItem.Name)
         "FileAntiPattern=*.orig;*.o;*.ob`;.git*;*.zip;copy-module.ps1;README.md",
     }
-#>
+    #>
     Write-Debug -Message "`$script:kdiffConfig is set. `$script:kdArgs: $script:kdArgs" | Tee-Object -FilePath $script:logFile -Append
     try
     {
@@ -199,6 +207,7 @@ function Merge-Repository
         Write-Output -InputObject 'file1 (A) not found; nothing to merge.' | Tee-Object -FilePath $script:logFile -Append
     }
 
+    #region File1
     # To handle spaces in paths, for kdiff3, without triggering ValidateScript errors against the functions defined parameters, we copy the function paramters to internal variables
     # kdiff file1 / 'A' = $SourcePath
     # kdiff file2 / 'B' = $TargetPath
@@ -209,9 +218,10 @@ function Merge-Repository
     } else {
         $SourcePath = $file1
     }
+    #EndRegion
 
-    #region copyfile2
-    $erroractionpreference = 'stop'
+    #region File2
+    $ErrorActionPreference = 'stop'
 
     Write-Debug -Message "Test-Path -Path $file2"
 
@@ -227,8 +237,7 @@ function Merge-Repository
         Write-Output -InputObject 'file2 (B) not found; nothing to merge. Copying via Copy-Item.' | Tee-Object -FilePath $script:logFile -Append
         Copy-Item -Path $file1 -Destination $file2 -Recurse -Confirm | Tee-Object -FilePath $script:logFile -Append
     }
-
-    #endregion
+    #EndRegion
 
     if ($file2.Contains(' ')) {
         Write-Debug -Message "Wrapping `$TargetPath with double-quotes"
@@ -237,16 +246,17 @@ function Merge-Repository
         $TargetPath = $file2
     }
 
+    #region File2
     if ($file3.Contains(' ')) {
         Write-Debug -Message "Wrapping `$MergePath with double-quotes"
         $MergePath = """$file3"""
     } else {
         $MergePath = $file3
     }
-#endregion
+    #EndRegion
 
     # ======== PROCESS ==================
-#region Merge
+    #region Merge
     # Show what we're going to run on the console, then actually run it.
     if ([bool]$MergePath)
     {
@@ -274,9 +284,9 @@ function Merge-Repository
             {
                 $rcTarget = $TargetPath
             }
-            Write-Verbose -Message "robocopy $MergePath $rcTarget /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:rclogFile"
-            Write-Output -InputObject "robocopy $MergePath $rcTarget /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:rclogFile" | Out-File -FilePath $script:logFile -Append
-            & robocopy.exe $MergePath $rcTarget /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:rclogFile
+            Write-Verbose -Message "robocopy $MergePath $rcTarget /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:RCLogFile"
+            Write-Output -InputObject "robocopy $MergePath $rcTarget /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:RCLogFile" | Out-File -FilePath $script:logFile -Append
+            & robocopy.exe $MergePath $rcTarget /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:RCLogFile
         }
     }
     else
@@ -291,17 +301,12 @@ function Merge-Repository
                 Start-Process -FilePath $script:kdiff -ArgumentList "$SourcePath $TargetPath $script:kdArgs" -Wait
                 # In a 2-way merge, with SyncMode=1 kdiff3 can sync both directories, so we can skip the copy/mirror-back activity of the 3-way merge above.
             }
-    #            }
-    #            else
-    #            {
-    #                Write-Output -InputObject "File hashes match; no action needed." | Tee-Object -FilePath $script:logFile -Append
-    #            }
     }
-    #endregion
+    #EndRegion
 
-    Write-Output -InputObject "`n$(Get-Date -Format g) # Ending $($MyScriptInfo.CommandName)`n" | Tee-Object -FilePath $script:logFile -Append
+    Write-Output -InputObject "`n$(Get-Date -Format g) # Ending Merge-Repository`n" | Tee-Object -FilePath $script:logFile -Append
     # ======== THE END ======================
-    Write-Output -InputObject '' | Tee-Object -FilePath $script:logFile -Append
+    # Write-Output -InputObject '' | Tee-Object -FilePath $script:logFile -Append
 
 }
 
@@ -323,7 +328,8 @@ function Merge-MyPSFiles
     $3PModules = Get-Module -ListAvailable -Refresh | Where-Object -FilterScript {($PSItem.Author -ne "$Author") -and ($PSItem.Path -notlike "*system32*")} | Select-Object -Property Name,Author
 
     # My own 'custom' modules
-    $MyModules = Get-Module -ListAvailable -Refresh | Where-Object -FilterScript {($PSItem.Author -eq "$Author")} # @('EditModule', 'ProfilePal', 'PSLogger', 'Sperry') # UpGuard')
+    # @('EditModule', 'ProfilePal', 'PSLogger', 'Sperry') # UpGuard')
+    $MyModules = Get-Module -ListAvailable -Refresh | Where-Object -FilterScript {($PSItem.Author -eq "$Author")}
 
     # *** update design to be considerate of branch bandwidth when copying from local to H:, but optimize for performance when copying in NAS
     if (-not [bool](Get-Variable -Name onServer -Scope Global -ErrorAction Ignore))
@@ -335,11 +341,11 @@ function Merge-MyPSFiles
         }
     }
 
-    # if 'online' at work, then we merge 3 repos, including to target H: drive
-#region Merge at work
+    # if 'online' at work, then we merge 3 repos to target network share / home drive
+    #region Merge at work
     if ($Global:onServer)
     {
-        Write-Output -InputObject "Detected running on server OS. Merge & syncronizing to shared repository(ies)." | Tee-Object -FilePath $script:logFile -Append
+        Write-Output -InputObject "Detected running on server OS. Merge to shared repository(ies)." | Tee-Object -FilePath $script:logFile -Append
         
         # Declare root path of where modules should be merged To
         $myModulesRoot = join-path -Path $myPShome -ChildPath 'Modules'
@@ -360,18 +366,18 @@ function Merge-MyPSFiles
             }
 
             # robocopy.exe writes wierd characters, if/when we let it share, so robocopy gets it's own log file
-            $script:rclogFile = $(Join-Path -Path $script:logFileBase -ChildPath "$script:logFilePrefix-robocopy-$(Get-Date -UFormat '%Y%m%d').log")
+            $script:RCLogFile = $(Join-Path -Path $script:logFileBase -ChildPath "$script:logFilePrefix-robocopy-$(Get-Date -UFormat '%Y%m%d').log")
 
             Write-Verbose -Message "Robocopying $module from $script:rcSource to $script:rcTarget" | Tee-Object -FilePath $script:logFile -Append
-            Start-Process -FilePath robocopy.exe -ArgumentList "$script:rcSource $script:rcTarget /MIR /TEE /LOG+:$script:rclogFile /IPG:777 /R:1 /W:1 /NP /TS /FP /DCOPY:T /DST /XD .git /XF .gitattributes /NJH" -Wait -Verb open
+            Start-Process -FilePath robocopy.exe -ArgumentList "$script:rcSource $script:rcTarget /MIR /TEE /LOG+:$script:RCLogFile /IPG:777 /R:1 /W:1 /NP /TS /FP /DCOPY:T /DST /XD .git /XF .gitattributes /NJH" -Wait -Verb open
 
             # repeat robocopy to to '2' account Modules path
             $script:rcTarget = ($script:rcTarget -replace $env:USERNAME,$($env:USERNAME+'2'))
             Write-Verbose -Message "Robocopying $module from $script:rcSource to $script:rcTarget" | Tee-Object -FilePath $script:logFile -Append
-            Start-Process -FilePath robocopy.exe -ArgumentList "$script:rcTarget $script:rcTarget /MIR /TEE /LOG+:$script:rclogFile /R:1 /W:1 /NP /TS /FP /DCOPY:T /DST /XD .git /XF .orig .gitattributes /NJH" -Wait -Verb open
+            Start-Process -FilePath robocopy.exe -ArgumentList "$script:rcTarget $script:rcTarget /MIR /TEE /LOG+:$script:RCLogFile /R:1 /W:1 /NP /TS /FP /DCOPY:T /DST /XD .git /XF .orig .gitattributes /NJH" -Wait -Verb open
 
             # repeat robocopy to PowerShell-Modules repository
-            Start-Process -FilePath robocopy.exe -ArgumentList "$script:rcSource \\hcdata\apps\IT\PowerShell-Modules\$module /MIR /TEE /LOG+:$script:rclogFile /R:1 /W:1 /NP /TS /FP /DCOPY:T /DST /XD .git /XF .gitattributes /NJH" -Wait -Verb open
+            Start-Process -FilePath robocopy.exe -ArgumentList "$script:rcSource \\hcdata\apps\IT\PowerShell-Modules\$module /MIR /TEE /LOG+:$script:RCLogFile /R:1 /W:1 /NP /TS /FP /DCOPY:T /DST /XD .git /XF .gitattributes /NJH" -Wait -Verb open
         }
 
         # Declare / define admin '2' account home share path
@@ -401,8 +407,8 @@ function Merge-MyPSFiles
                 Merge-Repository -SourcePath "$((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase)" -TargetPath "$script:modFullPath"
 
                 # then mirror back final $HOME workspace to 'admin' (2) workspace 
-                Write-Verbose -Message "robocopy $script:modFullPath $($script:modFullPath -replace $script:myPShome,$private:2PShome) /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:rclogFile" | Out-File -FilePath $script:logFile -Append
-                Start-Process -FilePath robocopy.exe -ArgumentList "$script:modFullPath $($script:modFullPath -replace $script:myPShome,$private:2PShome) /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:rclogFile" -Wait -Verb open
+                Write-Verbose -Message "robocopy $script:modFullPath $($script:modFullPath -replace $script:myPShome,$private:2PShome) /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:RCLogFile" | Out-File -FilePath $script:logFile -Append
+                Start-Process -FilePath robocopy.exe -ArgumentList "$script:modFullPath $($script:modFullPath -replace $script:myPShome,$private:2PShome) /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:RCLogFile" -Wait -Verb open
             } # end if Compare-Directory
         }
 
@@ -418,7 +424,7 @@ function Merge-MyPSFiles
             Write-Verbose -Message "Compare-Directory function indicates differences detected between repositories. Proceeding with Merge-Repository."
             # Merge / sync from $script:myPShome (share)  \scripts folder to '2' account share; presumably mapped to I: drive root e.g. by Sperry module
             Write-Output -InputObject 'Merging $script:myPShome\scripts folder' | Tee-Object -FilePath $script:logFile -Append
-    #        $script:adminHomeWPS = $script:myPShome -replace $env:USERNAME,$($env:USERNAME+'2')
+        # $script:adminHomeWPS = $script:myPShome -replace $env:USERNAME,$($env:USERNAME+'2')
             Merge-Repository -SourcePath "$(Join-Path -Path $script:myPShome -ChildPath 'Scripts')" -TargetPath "$(Join-Path -Path $private:2PShome -ChildPath 'Scripts')"
 
             # Merge / sync from PowerShell (console) Profile script
@@ -443,46 +449,43 @@ function Merge-MyPSFiles
 
         } # end if Compare-Directory
     } # end if onServer
-#endregion
+    #EndRegion
 
-#region Merge offline
-    # otherwise, only merge repositories on local system
-    if (-not $Global:onServer)
+    #region Merge offline
+    # otherwise, only merge repositories on local system, conditionally target network share / home drive (if mapped and available)
+    else
     {
         Write-Output -InputObject 'Performing local (2-way) merges' | Tee-Object -FilePath $script:logFile -Append
         # Derive target path root from (Global) $myPShome, of which the -Parent dir should be [My ]Documents
+
+        if (Test-Path -Path $script:netPShome -ErrorAction SilentlyContinue) {
+            Write-Output -InputObject 'Performing $HOME merges' | Tee-Object -FilePath $script:logFile -Append
+            start-sleep -Milliseconds 123
+            # Derive target path root from (Global) $myPShome, of which the -Parent dir should be [My ]Documents
+            foreach ($module in $MyModules)
+            {
+                Write-Output -InputObject "Merging $module (to `$netPShome)" | Tee-Object -FilePath $script:logFile -Append
+                Merge-Repository -SourcePath $((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase) -TargetPath (Join-Path -Path $script:netPShome -ChildPath "Modules\$module")
+            }
+
+            # Merge local PowerShell\Scripts folder with $HOME\PowerShell\Scripts folder
+            $script:PSScripts = Join-Path -Path $myPShome -ChildPath 'Scripts'
+            Merge-Repository -SourcePath $script:PSScripts -TargetPath (Join-Path -Path $script:netPShome -ChildPath 'Scripts')
+        }
+        else
+        {
+            Write-Warning -Message "Failed to locate mapped path $script:netPShome. Try re-running Mount-Path function."
+        }
+
         foreach ($module in $MyModules)
         {
             Write-Output -InputObject "Merging $module (locally)" | Tee-Object -FilePath $script:logFile -Append
             Merge-Repository -SourcePath $((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase) -TargetPath $env:USERPROFILE\Documents\GitHub\$module
         }
 
-        # Merge PowerShell\Scripts folder with ..\GitHub\MyScripts local repo
+        # Merge PowerShell\Scripts folder with local repo
         $script:ghMyScripts = Join-Path -Path $(Split-Path -Path $myPShome -Parent) -ChildPath 'GitHub\MyScripts'
-        $script:PSScripts = Join-Path -Path $myPShome -ChildPath 'Scripts'
         Merge-Repository -SourcePath $script:PSScripts -TargetPath $script:ghMyScripts
-
-        $PShome = 'H:\My Documents\WindowsPowerShell'
-
-        if (Test-Path -Path $PShome -ErrorAction SilentlyContinue)
-        {
-
-            Write-Output -InputObject 'Performing $HOME (2-way) merges' | Tee-Object -FilePath $script:logFile -Append
-            # Derive target path root from (Global) $myPShome, of which the -Parent dir should be [My ]Documents
-            foreach ($module in $MyModules)
-            {
-                Write-Output -InputObject "Merging $module (locally)" | Tee-Object -FilePath $script:logFile -Append
-                Merge-Repository -SourcePath $((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase) -TargetPath (Join-Path -Path $PShome -ChildPath "Modules\$module")
-            }
-
-            # Merge local PowerShell\Scripts folder with $HOME\PowerShell\Scripts folder
-            # $script:ghMyScripts = Join-Path -Path $(Split-Path -Path $myPShome -Parent) -ChildPath 'GitHub\MyScripts'
-            Merge-Repository -SourcePath $script:PSScripts -TargetPath (Join-Path -Path $PShome -ChildPath 'Scripts')
-        }
-        else
-        {
-            Write-Warning -Message "Failed to locate mapped path $PShome. Try re-running Mount-Path function."
-        }
         
         # While we're at it merge primary profile script
         if (Test-Path -Path $PROFILE)
@@ -493,11 +496,11 @@ function Merge-MyPSFiles
             # Diff/Merge or copy the file
             if (Test-Path -Path $script:ScriptTargetPath -ErrorAction Stop)
             {
-                Write-Verbose -Message "Copying profile script to $script:ghMyScripts" | Tee-Object -FilePath $script:logFile -Append
+                Write-Verbose -Message "Merging profile script to $script:ScriptTargetPath" | Tee-Object -FilePath $script:logFile -Append
                 # Get file hashes and compare. If the hashes match, Compare-Object returns $false, so invert desired boolean using -not 
                 if ( -not [bool](Compare-Object -ReferenceObject (get-filehash -Path $script:ScriptSourcePath) (get-filehash -Path $script:ScriptTargetPath) -Property Hash))
                 {
-                    Write-Verbose -Message "Copying profile script $script:ScriptSourcePath" | Tee-Object -FilePath $script:logFile -Append
+                    Write-Verbose -Message "Merging profile script $script:ScriptSourcePath" | Tee-Object -FilePath $script:logFile -Append
                     Merge-Repository -SourcePath $script:ScriptSourcePath -TargetPath $script:ScriptTargetPath
                 }
                 else
@@ -506,16 +509,16 @@ function Merge-MyPSFiles
                 }
             }
 
-            $script:ScriptTargetPath = Join-Path -Path $script:ghMyScripts -ChildPath $(($PROFILE | Get-ChildItem).Name)
+            $script:ScriptTargetPath = Join-Path -Path $script:netPShome -ChildPath $(($PROFILE | Get-ChildItem).Name)
 
             # Diff/Merge or copy the file
             if (Test-Path -Path $script:ScriptTargetPath -ErrorAction Stop)
             {
-                Write-Verbose -Message "Copying profile script to $script:ghMyScripts" | Tee-Object -FilePath $script:logFile -Append
+                Write-Verbose -Message "Merging profile script to $script:ScriptTargetPath" | Tee-Object -FilePath $script:logFile -Append
                 # Get file hashes and compare. If the hashes match, Compare-Object returns $false, so invert desired boolean using -not 
                 if ( -not [bool](Compare-Object -ReferenceObject (get-filehash -Path $script:ScriptSourcePath) (get-filehash -Path $script:ScriptTargetPath) -Property Hash))
                 {
-                    Write-Verbose -Message "Copying profile script $script:ScriptSourcePath" | Tee-Object -FilePath $script:logFile -Append
+                    Write-Verbose -Message "Merging profile script $script:ScriptSourcePath" | Tee-Object -FilePath $script:logFile -Append
                     Merge-Repository -SourcePath $script:ScriptSourcePath -TargetPath $script:ScriptTargetPath
                 }
                 else
@@ -526,11 +529,11 @@ function Merge-MyPSFiles
 
         } # end if test-path
     } # end if NOT onServer
-    #endregion
+    #EndRegion
 
-    Write-Output -InputObject "`n$(Get-Date -Format g) # Ending $($MyScriptInfo.CommandName)" | Tee-Object -FilePath $script:logFile -Append
+    Write-Output -InputObject "`n$(Get-Date -Format g) # Ending Merge-MyPSFiles`n" | Tee-Object -FilePath $script:logFile -Append
     # ======== THE END ======================
-    Write-Output -InputObject '' | Tee-Object -FilePath $script:logFile -Append
+#    Write-Output -InputObject '' | Tee-Object -FilePath $script:logFile -Append
 
     # and then open GitHub desktop
     Set-ProcessState -ProcessName github -Action Start -Verbose
