@@ -42,6 +42,7 @@ function Get-NetSite
 #>
     New-Variable -Name outputobj -Description 'Object to be returned by this function' -Scope Private
     Get-IPAddress | ForEach-Object -Process {
+        # Is there a better way to make this a lookup, e.g. from an Array ... that could be referenced in JSON or CSV?
         switch -Regex ($PSItem.IPAddress) {
             ^10\.10\.\d+
             {
@@ -73,7 +74,11 @@ function Get-NetSite
                 $Private:SiteName = 'Corporate'
                 break
             }
-            ^192\.168\.\d+
+            ^10\.100\.\d+
+            {
+                $Private:SiteName = 'NCB - Chelan'
+                break
+            }            ^10\.116\.1\.\d+
             {
                 $Private:SiteName = 'Private NAT'
                 break

@@ -6,7 +6,7 @@
 Write-Verbose -Message 'Declaring function Open-Code'
 function Open-Code
 {
-    [CmdletBinding(SupportsShouldProcess)]
+[CmdletBinding(SupportsShouldProcess)]
 <#
     Potential enhancements, as examples of code.exe / code-insiders.exe parameters
         --install-extension guosong.vscode-util --install-extension ms-vscode.PowerShell --install-extension Shan.code-settings-sync --install-extension wmaurer.change-case --install-extension DavidAnson.vscode-markdownlint

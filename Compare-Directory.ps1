@@ -100,6 +100,7 @@ function Compare-Directory
 
 	begin
 	{
+        # Get the contents of the base reference file/directory array for later comparison
 		Write-Verbose -Message "Getting FileComparisonAttribute for reference directory $referenceDirectory"
         Write-Debug -Message "Add-FileComparisonAttribute -DirectoryPath $referenceDirectory -ExcludeFile $ExcludeFile -ExcludeDirectory $ExcludeDirectory -Recurse:$Recurse"
         $referenceDirectoryFiles = Add-FileComparisonAttribute -DirectoryPath $referenceDirectory -ExcludeFile $ExcludeFile -ExcludeDirectory $ExcludeDirectory -Recurse:$Recurse
@@ -112,13 +113,11 @@ function Compare-Directory
 		{
 			foreach($nextPath in $DifferenceDirectory)
 			{
+				# Get and compare the contents of the next file/directory array and return the results
 		        Write-Verbose -Message "Getting FileComparisonAttributes Function for difference directory $nextpath"
 		        Write-Debug -Message "Add-FileComparisonAttribute -DirectoryPath $nextpath -ExcludeFile $ExcludeFile -ExcludeDirectory $ExcludeDirectory -Recurse:$Recurse"
 				$nextDifferenceFiles = Add-FileComparisonAttribute -DirectoryPath $nextpath -ExcludeFile $ExcludeFile -ExcludeDirectory $ExcludeDirectory -Recurse:$Recurse
 
-				# Compare the contents of the two file/directory arrays and return the results
-		        Write-Verbose -Message "Getting FileComparisonAttributes Function for reference directory $referenceDirectory"
-		        Write-Debug -Message "Add-FileComparisonAttribute -DirectoryPath $nextpath -ExcludeFile $ExcludeFile -ExcludeDirectory $ExcludeDirectory -Recurse:$Recurse"
 				$results = @(Compare-Object -ReferenceObject $referenceDirectoryFiles -DifferenceObject $nextDifferenceFiles -ExcludeDifferent:$ExcludeDifferent -IncludeEqual:$IncludeEqual -PassThru:$PassThru -Property Name, MD5Hash | Select-Object -Property Name, LastWriteTime, MD5Hash, SideIndicator)
 
 				if ( -not $PassThru)
@@ -135,7 +134,7 @@ function Compare-Directory
 					
 						# Find the original item in the files array
 						# $itemPath = $(Join-Path $path $result.CompareName) #.ToString().TrimEnd('\')
-						$item = $pathFiles | where { $PSItem.fullName -eq $(Join-Path -Path $path -ChildPath $result.Name) }
+						$item = $pathFiles | Where-Object -FilterScript { $PSItem.fullName -eq $(Join-Path -Path $path -ChildPath $result.Name) }
 
 						$result | Add-Member -NotePropertyName "Item" -NotePropertyValue $item
 					}
@@ -151,9 +150,10 @@ function Compare-Directory
 
     end
     {
-        $differences = 0
-        $results | % {$differences+=1}
-        if ($differences -gt 0)
+        # $differences = 0
+        # $results | % {$differences+=1}
+        # if ($differences -gt 0)
+        if ($results.Count -gt 0)
         {
             return $false
         }

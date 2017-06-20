@@ -60,15 +60,29 @@ Write-Verbose -Message '[PowerDiff] Populating $MyScriptInfo'
 # all logging cmdlets later throughout this script should derive their logging path from this $logBase directory, by appending simply .log, or preferable [date].log
 if (-not [bool](Get-Variable -Name myPSHome -Scope Global -ErrorAction Ignore))
 {
-    $script:myPSHome = $(Join-Path -Path "$([Environment]::GetFolderPath('MyDocuments'))" -ChildPath 'WindowsPowerShell')
+    Write-Verbose -Message "Set `$script:myPSHome to $(Join-Path -Path "$([Environment]::GetFolderPath('MyDocuments'))" -ChildPath 'WindowsPowerShell')"
+    $script:myPSHome = Join-Path -Path "$([Environment]::GetFolderPath('MyDocuments'))" -ChildPath 'WindowsPowerShell'
 }
 
 if ($myPSHome -match "$env:SystemDrive") {
+    Write-Verbose -Message "Set `$script:localPSHome to $myPSHome"
     $script:localPSHome = $myPSHome
 }
 
+# In case %HOMEDRIVE% appears to be local, try to use a 'default network home share drive "h"
+if (Test-Path -Path 'H:') {
+    Write-Verbose -Message "Set `$script:netPSHome to $(Join-Path -Path 'H:' -ChildPath '*\WindowsPowerShell' -Resolve)"
+    $script:netPSHome = Join-Path -Path 'H:' -ChildPath '*\WindowsPowerShell' -Resolve
+} else {
+    $script:netPSHome = $null
+}
+
+# If %HOMEDRIVE% does not match %SystemDrive%, then it's a network drive, so use that 
 if ($env:HOMEDRIVE -ne $env:SystemDrive) {
-    $script:netPSHome = Join-Path -Path 'H:\' -ChildPath '*\WindowsPowerShell' -Resolve
+    if (Test-Path -Path $env:HOMEDRIVE) {
+        Write-Verbose -Message "Set `$script:netPSHome to `$env:HOMEDRIVE ($env:HOMEDRIVE)"
+        $script:netPSHome = Join-Path -Path $env:HOMEDRIVE -ChildPath '*\WindowsPowerShell' -Resolve
+    }
 }
 
 $script:logFileBase = $(Join-Path -Path $myPSHome -ChildPath 'log')
@@ -350,7 +364,7 @@ function Merge-MyPSFiles
         # Declare root path of where modules should be merged To
         $myModulesRoot = join-path -Path $myPShome -ChildPath 'Modules'
 
-        foreach ($module in $script:3PModules)
+        foreach ($module in $3PModules)
         {
             # Robocopy /MIR insted of  merge ... no need to merge 3rd party modules
             $script:rcTarget = """$(join-path -Path $myModulesRoot -ChildPath $module)"""
@@ -389,9 +403,10 @@ function Merge-MyPSFiles
             $script:modFullPath = join-path -Path $myModulesRoot -ChildPath $module
 
             # Compare Directories (via contained file hashes) before sending to Merge-Repository
-            Write-Verbose -Message "[bool](Compare-Directory -ReferenceDirectory $script:modFullPath -DifferenceDirectory $($script:modFullPath -replace $script:myPShome,$private:2PShome) -ExcludeFile ""*.orig"","".git*"",""*.md"",""*.tests.*"")"
-            Write-Verbose -Message "$([bool](Compare-Directory -ReferenceDirectory $script:modFullPath -DifferenceDirectory $($script:modFullPath -replace $script:myPShome,$private:2PShome) -ExcludeFile ""*.orig"","".git*"",""*.md"",""*.tests.*""))"
-            if (Compare-Directory -ReferenceDirectory $script:modFullPath -DifferenceDirectory $($script:modFullPath -replace $script:myPShome,$private:2PShome) -ExcludeFile "*.orig",".git*","*.md","*.tests.*")
+
+            Write-Verbose -Message "[bool](Compare-Directory -ReferenceDirectory $script:modFullPath -DifferenceDirectory $($script:modFullPath -replace '^H\:','I:') -ExcludeFile ""*.orig"","".git*"",""*.md"",""*.tests.*"")"
+            Write-Verbose -Message "$([bool](Compare-Directory -ReferenceDirectory $script:modFullPath -DifferenceDirectory $($script:modFullPath -replace '^H\:','I:') -ExcludeFile ""*.orig"","".git*"",""*.md"",""*.tests.*""))"
+            if (Compare-Directory -ReferenceDirectory $script:modFullPath -DifferenceDirectory $($script:modFullPath -replace '^H\:','I:') -ExcludeFile "*.orig",".git*","*.md","*.tests.*")
             {
                 Write-Verbose -Message "No differences detected between repositories. Skipping merge."
             }
@@ -399,22 +414,24 @@ function Merge-MyPSFiles
             {
                 Write-Verbose -Message "Compare-Directory function indicates differences detected between repositories. Proceeding with Merge-Repository."
                 # first merge from 'admin' (2) workspace to primary $HOME
-                Write-Verbose -Message "Merge-Repository -SourcePath $($script:modFullPath -replace $script:myPShome,$private:2PShome) -TargetPath $script:modFullPath" | Tee-Object -FilePath $script:logFile -Append
-                Merge-Repository -SourcePath "$($script:modFullPath -replace $script:myPShome,$private:2PShome)" -TargetPath "$script:modFullPath" 
+                Write-Verbose -Message "Merge-Repository -SourcePath $($script:modFullPath -replace '^H\:','I:') -TargetPath $script:modFullPath" | Tee-Object -FilePath $script:logFile -Append
+                Merge-Repository -SourcePath "$($script:modFullPath -replace '^H\:','I:')" -TargetPath "$script:modFullPath" 
 
-                # then merge network $HOME workspace with local
+            <#
+                These steps don't make sense, if we're already $onServer # then merge network $HOME workspace with local
                 Write-Verbose -Message "Merge-Repository -SourcePath $((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase) -TargetPath $script:modFullPath" | Tee-Object -FilePath $script:logFile -Append
                 Merge-Repository -SourcePath "$((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase)" -TargetPath "$script:modFullPath"
 
                 # then mirror back final $HOME workspace to 'admin' (2) workspace 
-                Write-Verbose -Message "robocopy $script:modFullPath $($script:modFullPath -replace $script:myPShome,$private:2PShome) /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:RCLogFile" | Out-File -FilePath $script:logFile -Append
-                Start-Process -FilePath robocopy.exe -ArgumentList "$script:modFullPath $($script:modFullPath -replace $script:myPShome,$private:2PShome) /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:RCLogFile" -Wait -Verb open
+                Write-Verbose -Message "robocopy $script:modFullPath $($script:modFullPath -replace '^H\:','I:') /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:RCLogFile" | Out-File -FilePath $script:logFile -Append
+                Start-Process -FilePath robocopy.exe -ArgumentList "$script:modFullPath $($script:modFullPath -replace '^H\:','I:') /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:RCLogFile" -Wait -Verb open
+            #>
             } # end if Compare-Directory
         }
 
         # Compare Directories (via contained file hashes) before sending to Merge-Repository
-        Write-Verbose -Message "[bool](Compare-Directory -ReferenceDirectory $(Join-Path -Path $script:myPShome -ChildPath 'Scripts') -DifferenceDirectory $(Join-Path -Path $private:2PShome -ChildPath 'Scripts') -ExcludeFile ""*.orig"","".git*"",""*.md"",""*.tests.*"" -IncludeEqual)"
-        Write-Verbose -Message "$([bool](Compare-Directory -ReferenceDirectory $(Join-Path -Path $script:myPShome -ChildPath 'Scripts') -DifferenceDirectory $(Join-Path -Path $private:2PShome -ChildPath 'Scripts') -ExcludeFile ""*.orig"","".git*"",""*.md"",""*.tests.*"" -IncludeEqual))"
+        Write-Verbose -Message "### Test: [bool](Compare-Directory -ReferenceDirectory $(Join-Path -Path $script:myPShome -ChildPath 'Scripts') -DifferenceDirectory $(Join-Path -Path $private:2PShome -ChildPath 'Scripts') -ExcludeFile ""*.orig"","".git*"",""*.md"",""*.tests.*"" -IncludeEqual)"
+        Write-Verbose -Message "### Result: $([bool](Compare-Directory -ReferenceDirectory $(Join-Path -Path $script:myPShome -ChildPath 'Scripts') -DifferenceDirectory $(Join-Path -Path $private:2PShome -ChildPath 'Scripts') -ExcludeFile ""*.orig"","".git*"",""*.md"",""*.tests.*"" -IncludeEqual))"
         if (Compare-Directory -ReferenceDirectory $(Join-Path -Path $script:myPShome -ChildPath 'Scripts') -DifferenceDirectory $(Join-Path -Path $private:2PShome -ChildPath 'Scripts') -ExcludeFile "*.orig",".git*","*.md","*.tests.*")
         {
             Write-Verbose -Message "No differences detected between repositories. Skipping merge."
@@ -534,7 +551,4 @@ function Merge-MyPSFiles
     Write-Output -InputObject "`n$(Get-Date -Format g) # Ending Merge-MyPSFiles`n" | Tee-Object -FilePath $script:logFile -Append
     # ======== THE END ======================
 #    Write-Output -InputObject '' | Tee-Object -FilePath $script:logFile -Append
-
-    # and then open GitHub desktop
-    Set-ProcessState -ProcessName github -Action Start -Verbose
 } # end of function

@@ -1,5 +1,7 @@
 ﻿#Requires -Version 2
 # Enhanced May 2017 to support XenApp 7 and StoreFront
+[cmdletbinding()]
+Param()
 
 Write-Verbose -Message 'Declaring function Start-CitrixSession'
 function Start-CitrixSession {
@@ -41,35 +43,35 @@ function Start-CitrixSession {
 
 Write-Verbose -Message 'Declaring function Start-XenApp'
 function Start-XenApp {
-<#
-    .SYNOPSIS
-        Extension of Sperry module, to simplify invoking Citrix Receiver PNAgent.exe
-    .DESCRIPTION
-        Sets pnagent path string, assigns frequently used arguments to function parameters, including aliases to known /Qlaunch arguments
-    .PARAMETER Qlaunch
-        The Qlaunch parameter references a shortcut name, to be referenced against the known XenApp apps to launch, and then passes to pnagent to be launched by Citrix
-    .PARAMETER Reconnect
-        Requests that PNAgent attempt to reconnect to any existing Citrix XenApp session for the current user
-    .PARAMETER Terminatewait
-        Attempts to close all applications in the current user's Citrix XenApp session, and logoff from that session
-    .PARAMETER ListAvailable
-        Enumerates available XenApp shortcuts that can be passed to -QLaunch
+    <#
+        .SYNOPSIS
+            Extension of Sperry module, to simplify invoking Citrix Receiver PNAgent.exe
+        .DESCRIPTION
+            Sets pnagent path string, assigns frequently used arguments to function parameters, including aliases to known /Qlaunch arguments
+        .PARAMETER Qlaunch
+            The Qlaunch parameter references a shortcut name, to be referenced against the known XenApp apps to launch, and then passes to pnagent to be launched by Citrix
+        .PARAMETER Reconnect
+            Requests that PNAgent attempt to reconnect to any existing Citrix XenApp session for the current user
+        .PARAMETER Terminatewait
+            Attempts to close all applications in the current user's Citrix XenApp session, and logoff from that session
+        .PARAMETER ListAvailable
+            Enumerates available XenApp shortcuts that can be passed to -QLaunch
 
-    .EXAMPLE
-        PS C:\> Start-XenApp -Qlaunch rdp
-        Remote Desktop (or mstsc.exe) client, using the rdp alias, which is defined in the $XenApps hashtable
-    .EXAMPLE
-        PS C:\> Start-XenApp -open excel
-        Open Excel, using the -open alias for the -Qlaunch parameter
-    .EXAMPLE
-        PS C:\> Start-XenApp -ListAvailable
-        Enumerate available XenApp shortcuts to launch
-    .NOTES
-        NAME        :  Start-XenApp
-        VERSION     :  1.3
-        LAST UPDATED:  4/9/2015
-        AUTHOR      :  Bryan Dady
-#>
+        .EXAMPLE
+            PS C:\> Start-XenApp -Qlaunch rdp
+            Remote Desktop (or mstsc.exe) client, using the rdp alias, which is defined in the $XenApps hashtable
+        .EXAMPLE
+            PS C:\> Start-XenApp -open excel
+            Open Excel, using the -open alias for the -Qlaunch parameter
+        .EXAMPLE
+            PS C:\> Start-XenApp -ListAvailable
+            Enumerate available XenApp shortcuts to launch
+        .NOTES
+            NAME        :  Start-XenApp
+            VERSION     :  1.3
+            LAST UPDATED:  4/9/2015
+            AUTHOR      :  Bryan Dady
+    #>
     [CmdletBinding()]
     Param (
         [Parameter(
@@ -79,7 +81,6 @@ function Start-XenApp {
         [Alias('args','XenApp','qlaunch','start','open')]
         [String]
         $Launch,
-
         [Parameter(
             Position = 3,
             ParameterSetName = 'Launch'
@@ -88,7 +89,6 @@ function Start-XenApp {
         [Alias('connect')]
         [switch]
         $Reconnect,
-
         [Parameter(
             Position = 1,
             ParameterSetName = 'Mode'
@@ -152,14 +152,12 @@ function Start-XenApp {
         }
     } else {
         # Make StoreFront / SelfService default ICA client
-        Write-Verbose -Message 'Setting $ICAclient to SelfService.exe'
+        Write-Verbose -Message 'Setting $ICAClient to SelfService.exe'
         $Global:ICAClient = "${env:ProgramFiles(x86)}\Citrix\ICA Client\SelfServicePlugin\SelfService.exe"
         # Pull available Citrix apps details from local registry
-#        if ($Script:XenApps -eq 0) {
         Write-Verbose -Message 'Reading available XenApp definitions from registry'
         Get-ChildItem -LiteralPath HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall | Where-Object -FilterScript {$PSItem.Name -like "*glacier*"} | `
         ForEach-Object -Process {$script:XenApps.Add($($PSItem.GetValue('DisplayName')),$($PSItem.GetValue('LaunchString')))}
-#        }
     }
 
     # Process arguments

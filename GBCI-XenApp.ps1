@@ -5,11 +5,16 @@
 
 # ~/.config/powershell/Microsoft.PowerShell_profile.ps1    
 
-[cmdletbinding(SupportsShouldProcess)]
+[cmdletbinding()]
 Param()
 
-write-output -InputObject 'Loading functions from GBCI-XenApp.ps1' -verbose
+$StartXenApp = Join-Path -Path $(Split-Path -Path $MyInvocation.MyCommand.Path -Parent) -ChildPath 'Start-XenApp.ps1' -Resolve -ErrorAction Stop
+Write-Verbose -Message "Loading prerequisite functions from .\Start-XenApp.ps1"
+. $StartXenApp
 
+Write-Verbose -Message 'Loading functions from GBCI-XenApp.ps1'
+
+Write-Verbose -Message 'Declaring function Logon-Work'
 function Logon-Work
 {
   Write-Output -InputObject 'Set-Workplace -zone Office'
@@ -19,6 +24,7 @@ function Logon-Work
 
 New-Alias -Name start-work -Value logon-work -ErrorAction SilentlyContinue
 
+Write-Verbose -Message 'Declaring function Logoff-Work'
 function Logoff-Work
 {
   Write-Output -InputObject 'Set-Workplace -zone Remote'
@@ -28,7 +34,8 @@ function Logoff-Work
 
 New-Alias -Name stop-work -Value logoff-work -ErrorAction SilentlyContinue
 
-function open-workfront
+Write-Verbose -Message 'Declaring function Open-Workfront'
+function Open-Workfront
 {
   if ($Global:onServer)
   {
@@ -313,6 +320,7 @@ function pa_start
 function xa_restart
 {
   Write-Output -InputObject 'Restarting Citrix Receiver'
+  Start-XenApp
   Get-Process -Name receiver | stop-process
   & "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Citrix\Receiver.lnk"
 }
@@ -351,6 +359,7 @@ $thisHour = (Get-Date -DisplayHint Time).Hour
 Write-Debug -Message "(-not [bool](Get-ProcessByUser -ProcessName 'outlook.exe'))"
 if (($thisHour -ge 6) -and ($thisHour -le 18) -and ($Global:onServer) -and (-not [bool](Get-ProcessByUser -ProcessName 'outlook.exe')))
 {
+  Write-Verbose -Message 'Starting work apps'
   Write-output -InputObject ' # Default Printer # :'
   Get-Printer -Default
   
