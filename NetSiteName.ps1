@@ -1,46 +1,43 @@
 ﻿#requires -Version 3 -Modules PSLogger, Sperry
-
 <#
     Author: Bryan Dady
     Version: 1.0.3
     Version History: Created Get-NetSite function as an enhancement on the Get-IPAddress function
     2015/7/23 (1.0.3) : Add 10.92.x.x / 10.9n.x.x handling
     Purpose: Provide location/context information for a corporate network
-
 #>
 
 function Get-NetSite
 {
-<#
-    .SYNOPSIS
-        Returns a custom object with properties related to location on a corporate network, and basic DHCP info, collected from Get-IPAddress function.
-    .DESCRIPTION
-        Using the IP Address, determines the physical site/location that address is related to
-    .EXAMPLE
-        PS C:\> Get-IPAddress
-        Get-NetSite
+    <#
+        .SYNOPSIS
+            Returns a custom object with properties related to location on a corporate network, and basic DHCP info, collected from Get-IPAddress function.
+        .DESCRIPTION
+            Using the IP Address, determines the physical site/location that address is related to
+        .EXAMPLE
+            PS C:\> Get-IPAddress
+            Get-NetSite
 
-        SiteName           : Unrecognized
-        AdapterHost        : ComputerName
-        Gateway            : {192.168.1.11}
-        IPAddress          : {192.168.1.106}
-        DNSServers         : {192.168.0.1, 208.67.220.220, 208.67.222.222}
-        AdapterDescription : Intel(R) Wireless-N 7260
-    .EXAMPLE
-        PS C:\> Get-NetSite.IPAddress
-        # Returns only the IP Address(es) of DHCP enabled adapters, as a string
-        10.10.101.123
-    .NOTES
-        NAME        :  Get-NetSite
-        VERSION     :  1.0.0
-        LAST UPDATED:  5/1/2015
-        AUTHOR      :  Bryan Dady
-    .INPUTS
-        None
-    .OUTPUTS
-        Write-Log
-#>
-    New-Variable -Name outputobj -Description 'Object to be returned by this function' -Scope Private
+            SiteName           : Unrecognized
+            AdapterHost        : ComputerName
+            Gateway            : {192.168.1.11}
+            IPAddress          : {192.168.1.106}
+            DNSServers         : {192.168.0.1, 208.67.220.220, 208.67.222.222}
+            AdapterDescription : Intel(R) Wireless-N 7260
+        .EXAMPLE
+            PS C:\> Get-NetSite.IPAddress
+            # Returns only the IP Address(es) of DHCP enabled adapters, as a string
+            10.10.101.123
+        .NOTES
+            NAME        :  Get-NetSite
+            VERSION     :  1.0.0
+            LAST UPDATED:  5/1/2015
+            AUTHOR      :  Bryan Dady
+        .INPUTS
+            None
+        .OUTPUTS
+            Write-Log
+    #>
     Get-IPAddress | ForEach-Object -Process {
         # Is there a better way to make this a lookup, e.g. from an Array ... that could be referenced in JSON or CSV?
         switch -Regex ($PSItem.IPAddress) {
