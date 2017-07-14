@@ -60,8 +60,7 @@ $Author = 'Bryan Dady'
 #Derive $logBase from script name. The most reliable automatic variable for this is $MyInvocation.MyCommand.Name
 # But the value of this variable changes within Functions, so we define a shared logging base from the 'parent' script file (name) level
 # all logging cmdlets later throughout this script should derive their logging path from this $logBase directory, by appending simply .log, or preferable [date].log
-if (-not [bool](Get-Variable -Name myPSHome -Scope Global -ErrorAction Ignore))
-{
+if (-not [bool](Get-Variable -Name myPSHome -Scope Global -ErrorAction Ignore)) {
     Write-Verbose -Message "Set `$script:myPSHome to $(Join-Path -Path "$([Environment]::GetFolderPath('MyDocuments'))" -ChildPath 'WindowsPowerShell')"
     $script:myPSHome = Join-Path -Path "$([Environment]::GetFolderPath('MyDocuments'))" -ChildPath 'WindowsPowerShell'
 }
@@ -70,14 +69,8 @@ if ($myPSHome -match "$env:SystemDrive") {
     Write-Verbose -Message "Set `$script:localPSHome to $myPSHome"
     $script:localPSHome = $myPSHome
 }
+$script:netPSHome = $null
 
-# In case %HOMEDRIVE% appears to be local, try to use a 'default network home share drive "h"
-if (Test-Path -Path 'H:') {
-    Write-Verbose -Message "Set `$script:netPSHome to $(Join-Path -Path 'H:' -ChildPath '*\WindowsPowerShell' -Resolve)"
-    $script:netPSHome = Join-Path -Path 'H:' -ChildPath '*\WindowsPowerShell' -Resolve
-} else {
-    $script:netPSHome = $null
-}
 
 # If %HOMEDRIVE% does not match %SystemDrive%, then it's a network drive, so use that 
 if ($env:HOMEDRIVE -ne $env:SystemDrive) {
@@ -85,6 +78,14 @@ if ($env:HOMEDRIVE -ne $env:SystemDrive) {
         Write-Verbose -Message "Set `$script:netPSHome to `$env:HOMEDRIVE ($env:HOMEDRIVE)"
         $script:netPSHome = Join-Path -Path $env:HOMEDRIVE -ChildPath '*\WindowsPowerShell' -Resolve
     }
+}
+
+# In case %HOMEDRIVE% appears to be local, try to use a 'default network home share drive "H"
+if (($null -eq $script:netPSHome) -and (Test-Path -Path 'H:')) {
+    Write-Verbose -Message "Set `$script:netPSHome to $(Join-Path -Path 'H:' -ChildPath '*\WindowsPowerShell' -Resolve)"
+    $script:netPSHome = Join-Path -Path 'H:' -ChildPath '*\WindowsPowerShell' -Resolve
+#} else {
+#    $script:netPSHome = $null
 }
 
 $script:logFileBase = $(Join-Path -Path $myPSHome -ChildPath 'log')
@@ -97,12 +98,10 @@ Write-Debug -Message "  ... logFileBase is $script:logFileBase\$script:logFilePr
 # Define path to local copy of kdiff3.exe
 $script:kdiff = Join-Path -Path $env:ProgramFiles -ChildPath 'KDiff3\kdiff3.exe' # 'TortoiseHg\kdiff3.exe'
 
-if ( -not (Test-Path -Path $script:kdiff -PathType Leaf))
-{
+if ( -not (Test-Path -Path $script:kdiff -PathType Leaf)) {
     $script:kdiff = 'R:\IT\Utilities\KDiff3\kdiff3.exe'
-    if ( -not (Test-Path -Path $script:kdiff -PathType Leaf))
-    {
-        throw "Failed to find $script:kdiff" | Tee-Object -FilePath $script:logFile -Append
+    if ( -not (Test-Path -Path $script:kdiff -PathType Leaf)) {
+        Write-Warning -Message "Failed to find kdiff.exe at $script:kdiff"
     }
 }
 Write-Verbose -Message "Will use diff tool: $script:kdiff"
@@ -150,8 +149,7 @@ Write-Debug -Message " Dot-Sourcing $CompareDirectory"
 . $CompareDirectory
 
 Write-Verbose -Message "Declaring Function Merge-Repository"
-function Merge-Repository
-{
+function Merge-Repository {
     [CmdletBinding(SupportsShouldProcess)]
     Param(
         [Parameter(Mandatory = $true,Position = 0)]
@@ -186,6 +184,9 @@ function Merge-Repository
     # DEBUG MODE : $ErrorActionPreference = "Inquire"; "`$error = $error[0]"
 
     # ======== BEGIN ====================
+    if ( -not (Test-Path -Path $script:kdiff -PathType Leaf)) {
+        throw "`nFatal Error: Failed to find $script:kdiff`n"
+    }
 
     # Build dynamic logging file path at ...\[My ]Documents\WindowsPowershell\log\[scriptname]-[rundate].log
     $script:logFile = $(Join-Path -Path $script:logFileBase -ChildPath "$script:logFilePrefix-$(Get-Date -UFormat '%Y%m%d').log")
@@ -198,25 +199,21 @@ function Merge-Repository
 
     $script:kdArgs = ' --merge --auto'+' --cs '+$($script:kdiffConfig -join ' --cs ')+''
 
-    if ($Recurse)
-    {
+    if ($Recurse) {
         $script:kdArgs = $script:kdArgs -replace 'RecursiveDirs=0','RecursiveDirs=1'
     }
     <# RFE
     # enhance Parameter support to enable selective control of Recursion and File filtering
-    if ($Filter)
-    {
+    if ($Filter) {
         if ($script:kdiffConfig -like "*$Filter*" -notin $PSItem.Name)
         "FileAntiPattern=*.orig;*.o;*.ob`;.git*;*.zip;copy-module.ps1;README.md",
     }
     #>
     Write-Debug -Message "`$script:kdiffConfig is set. `$script:kdArgs: $script:kdArgs" | Tee-Object -FilePath $script:logFile -Append
-    try
-    {
+    try {
         (Test-Path -Path $file1 | Out-Null)
     }
-    catch
-    {
+    catch {
         Write-Output -InputObject "Error was $_" | Tee-Object -FilePath $script:logFile -Append
         $line = $MyInvocation.ScriptLineNumber | Tee-Object -FilePath $script:logFile -Append
         Write-Output -InputObject "Error was in Line $line" | Tee-Object -FilePath $script:logFile -Append
@@ -241,12 +238,10 @@ function Merge-Repository
 
     Write-Debug -Message "Test-Path -Path $file2"
 
-    try
-    {
+    try {
         (Test-Path -Path $file2 | Out-Null)
     }
-    catch
-    {
+    catch {
         Write-Output -InputObject "Error was $_" | Tee-Object -FilePath $script:logFile -Append
         $line = $MyInvocation.ScriptLineNumber
         Write-Output -InputObject "Error was in Line $line" | Tee-Object -FilePath $script:logFile -Append
@@ -274,8 +269,7 @@ function Merge-Repository
     # ======== PROCESS ==================
     #region Merge
     # Show what we're going to run on the console, then actually run it.
-    if ([bool]$MergePath)
-    {
+    if ([bool]$MergePath) {
         Write-Verbose -Message "Detected MergePath : $MergePath"
         Write-Verbose -Message "$script:kdiff $SourcePath $TargetPath $MergePath --output $MergePath $script:kdArgs"
 
@@ -292,21 +286,16 @@ function Merge-Repository
 
         if ($PSCmdlet.ShouldProcess($MergePath,$("Copy $MergePath via Robocopy"))) {
             Write-Output -InputObject "Mirroring $MergePath back to $(Split-Path -Path $file2) (using Robocopy)" | Tee-Object -FilePath $script:logFile -Append
-            if (Test-Path -Path $file2 -PathType Leaf | Out-Null)
-            {
+            if (Test-Path -Path $file2 -PathType Leaf | Out-Null) {
                 $rcTarget = $(Split-Path -Path $file2)
-            }
-            else
-            {
+            } else {
                 $rcTarget = $TargetPath
             }
             Write-Verbose -Message "robocopy $MergePath $rcTarget /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:RCLogFile"
             Write-Output -InputObject "robocopy $MergePath $rcTarget /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:RCLogFile" | Out-File -FilePath $script:logFile -Append
             & robocopy.exe $MergePath $rcTarget /L /MIR /TEE /MT /NP /TS /FP /DCOPY:T /DST /R:1 /W:1 /XF *.orig /NJH /NS /NC /NP /LOG+:$script:RCLogFile
         }
-    }
-    else
-    {
+    } else {
         Write-Verbose -Message 'No MergePath; 2-way merge'
     # * * * RFE : Move file-hash comparison into a function, so it can handle folder hash comparison
     #            if ( -not [bool](Compare-Object -ReferenceObject (get-filehash -Path $SourcePath) (get-filehash -Path $TargetPath) -Property Hash))
@@ -327,8 +316,7 @@ function Merge-Repository
 }
 
 Write-Verbose -Message "Declaring Function Merge-MyPSFiles"
-function Merge-MyPSFiles
-{
+function Merge-MyPSFiles {
     [CmdletBinding(SupportsShouldProcess)]
     param ()
 
@@ -344,39 +332,32 @@ function Merge-MyPSFiles
     $3PModules = Get-Module -ListAvailable -Refresh | Where-Object -FilterScript {($PSItem.Author -ne "$Author") -and ($PSItem.Path -notlike "*system32*")} | Select-Object -Property Name,Author
 
     # My own 'custom' modules
-    # @('EditModule', 'ProfilePal', 'PSLogger', 'Sperry') # UpGuard')
     $MyModules = Get-Module -ListAvailable -Refresh | Where-Object -FilterScript {($PSItem.Author -eq "$Author")}
 
     # *** update design to be considerate of branch bandwidth when copying from local to H:, but optimize for performance when copying in NAS
-    if (-not [bool](Get-Variable -Name onServer -Scope Global -ErrorAction Ignore))
-    {
+    if (-not [bool](Get-Variable -Name onServer -Scope Global -ErrorAction Ignore)) {
         [bool]$onServer = $false
-        if ((Get-WmiObject -Class Win32_OperatingSystem -Property Caption).Caption -like '*Windows Server*')
-        {
+        if ((Get-WmiObject -Class Win32_OperatingSystem -Property Caption).Caption -like '*Windows Server*') {
             [bool]$Global:onServer = $true
         }
     }
 
     # if 'online' at work, then we merge 3 repos to target network share / home drive
     #region Merge at work
-    if ($Global:onServer)
-    {
+    if ($Global:onServer) {
         Write-Output -InputObject "Detected running on server OS. Merge to shared repository(ies)." | Tee-Object -FilePath $script:logFile -Append
         
         # Declare root path of where modules should be merged To
         $myModulesRoot = join-path -Path $myPShome -ChildPath 'Modules'
 
-        foreach ($module in $3PModules)
-        {
+        foreach ($module in $3PModules) {
             # Robocopy /MIR insted of  merge ... no need to merge 3rd party modules
             $script:rcTarget = """$(join-path -Path $myModulesRoot -ChildPath $module)"""
-            try
-            {
+            try {
                 $script:rcSource = """$((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase)"""
                 Write-Output -InputObject "Updating $module (from $script:rcSource to $script:rcTarget with Robocopy)" | Tee-Object -FilePath $script:logFile -Append
             }
-            catch
-            {
+            catch {
                 Write-Warning -Message "Failed to read Module's directory property (ModuleBase)"
                 break
             }
@@ -399,8 +380,16 @@ function Merge-MyPSFiles
         # Declare / define admin '2' account home share path
         $private:2PShome = $script:myPShome -replace '^H\:','I:'
 
-        foreach ($module in $MyModules)
-        {
+        # If netPSHome is set, and I: drive is available, then we can proceed with syncing from netPSHome to I:
+        if ($script:netPSHome -and (Test-Path -Path $2PShome)) {
+            Write-Verbose -Message "Confirmed  source `$script:netPSHome and target `$script:2PShome are available"
+        } else {
+            # Invoke Mount-Path function, from Sperry module, to map all user's drives
+            Write-Warning -Message "Either  source `$script:netPSHome or target `$script:2PShome were NOT available ... Running Mount-Path to resolve"
+            Mount-Path
+        }
+
+        foreach ($module in $MyModules) {
             Write-Output -InputObject "Merging $module (onServer)" | Tee-Object -FilePath $script:logFile -Append
             $script:modFullPath = join-path -Path $myModulesRoot -ChildPath $module
 
@@ -408,12 +397,9 @@ function Merge-MyPSFiles
 
             Write-Verbose -Message "[bool](Compare-Directory -ReferenceDirectory $script:modFullPath -DifferenceDirectory $($script:modFullPath -replace '^H\:','I:') -ExcludeFile ""*.orig"","".git*"",""*.md"",""*.tests.*"")"
             Write-Verbose -Message "$([bool](Compare-Directory -ReferenceDirectory $script:modFullPath -DifferenceDirectory $($script:modFullPath -replace '^H\:','I:') -ExcludeFile ""*.orig"","".git*"",""*.md"",""*.tests.*""))"
-            if (Compare-Directory -ReferenceDirectory $script:modFullPath -DifferenceDirectory $($script:modFullPath -replace '^H\:','I:') -ExcludeFile "*.orig",".git*","*.md","*.tests.*")
-            {
+            if (Compare-Directory -ReferenceDirectory $script:modFullPath -DifferenceDirectory $($script:modFullPath -replace '^H\:','I:') -ExcludeFile "*.orig",".git*","*.md","*.tests.*") {
                 Write-Verbose -Message "No differences detected between repositories. Skipping merge."
-            }
-            else
-            {
+            } else {
                 Write-Verbose -Message "Compare-Directory function indicates differences detected between repositories. Proceeding with Merge-Repository."
                 # first merge from 'admin' (2) workspace to primary $HOME
                 Write-Verbose -Message "Merge-Repository -SourcePath $($script:modFullPath -replace '^H\:','I:') -TargetPath $script:modFullPath" | Tee-Object -FilePath $script:logFile -Append
@@ -434,12 +420,9 @@ function Merge-MyPSFiles
         # Compare Directories (via contained file hashes) before sending to Merge-Repository
         Write-Verbose -Message "### Test: [bool](Compare-Directory -ReferenceDirectory $(Join-Path -Path $script:myPShome -ChildPath 'Scripts') -DifferenceDirectory $(Join-Path -Path $private:2PShome -ChildPath 'Scripts') -ExcludeFile ""*.orig"","".git*"",""*.md"",""*.tests.*"" -IncludeEqual)"
         Write-Verbose -Message "### Result: $([bool](Compare-Directory -ReferenceDirectory $(Join-Path -Path $script:myPShome -ChildPath 'Scripts') -DifferenceDirectory $(Join-Path -Path $private:2PShome -ChildPath 'Scripts') -ExcludeFile ""*.orig"","".git*"",""*.md"",""*.tests.*"" -IncludeEqual))"
-        if (Compare-Directory -ReferenceDirectory $(Join-Path -Path $script:myPShome -ChildPath 'Scripts') -DifferenceDirectory $(Join-Path -Path $private:2PShome -ChildPath 'Scripts') -ExcludeFile "*.orig",".git*","*.md","*.tests.*")
-        {
+        if (Compare-Directory -ReferenceDirectory $(Join-Path -Path $script:myPShome -ChildPath 'Scripts') -DifferenceDirectory $(Join-Path -Path $private:2PShome -ChildPath 'Scripts') -ExcludeFile "*.orig",".git*","*.md","*.tests.*") {
             Write-Verbose -Message "No differences detected between repositories. Skipping merge."
-        }
-        else
-        {
+        } else {
             Write-Verbose -Message "Compare-Directory function indicates differences detected between repositories. Proceeding with Merge-Repository."
             # Merge / sync from $script:myPShome (share)  \scripts folder to '2' account share; presumably mapped to I: drive root e.g. by Sperry module
             Write-Output -InputObject 'Merging $script:myPShome\scripts folder' | Tee-Object -FilePath $script:logFile -Append
@@ -451,17 +434,13 @@ function Merge-MyPSFiles
             $script:ScriptTargetPath = Join-Path -Path $private:2PShome -ChildPath $(($PROFILE | Get-ChildItem).Name)
 
             # Diff/Merge or copy the file
-            if (Test-Path -Path $script:ScriptTargetPath -ErrorAction Stop)
-            {
+            if (Test-Path -Path $script:ScriptTargetPath -ErrorAction Stop) {
                 Write-Verbose -Message "Copying profile script to $private:2PShome" | Tee-Object -FilePath $script:logFile -Append
                 # Get file hashes and compare. If the hashes match, Compare-Object returns $false, so invert desired boolean using -not 
-                if ( -not [bool](Compare-Object -ReferenceObject $(get-filehash -Path $script:ScriptSourcePath).Hash -DifferenceObject $(get-filehash -Path $script:ScriptTargetPath).Hash -IncludeEqual))
-                {
+                if ( -not [bool](Compare-Object -ReferenceObject $(get-filehash -Path $script:ScriptSourcePath).Hash -DifferenceObject $(get-filehash -Path $script:ScriptTargetPath).Hash -IncludeEqual)) {
                     Write-Verbose -Message "Copying profile script $script:ScriptSourcePath" | Tee-Object -FilePath $script:logFile -Append
                     Merge-Repository -SourcePath $script:ScriptSourcePath -TargetPath $script:ScriptTargetPath
-                }
-                else
-                {
+                } else {
                     Write-Output -InputObject "File hashes match; no action needed." | Tee-Object -FilePath $script:logFile -Append
                 }
             } # end if Test-Path
@@ -472,8 +451,7 @@ function Merge-MyPSFiles
 
     #region Merge offline
     # otherwise, only merge repositories on local system, conditionally target network share / home drive (if mapped and available)
-    else
-    {
+    else {
         Write-Output -InputObject 'Performing local (2-way) merges' | Tee-Object -FilePath $script:logFile -Append
         # Derive target path root from (Global) $myPShome, of which the -Parent dir should be [My ]Documents
 
@@ -481,8 +459,7 @@ function Merge-MyPSFiles
             Write-Output -InputObject 'Performing $HOME merges' | Tee-Object -FilePath $script:logFile -Append
             start-sleep -Milliseconds 123
             # Derive target path root from (Global) $myPShome, of which the -Parent dir should be [My ]Documents
-            foreach ($module in $MyModules)
-            {
+            foreach ($module in $MyModules) {
                 Write-Output -InputObject "Merging $module (to `$netPShome)" | Tee-Object -FilePath $script:logFile -Append
                 Merge-Repository -SourcePath $((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase) -TargetPath (Join-Path -Path $script:netPShome -ChildPath "Modules\$module")
             }
@@ -490,14 +467,11 @@ function Merge-MyPSFiles
             # Merge local PowerShell\Scripts folder with $HOME\PowerShell\Scripts folder
             $script:PSScripts = Join-Path -Path $myPShome -ChildPath 'Scripts'
             Merge-Repository -SourcePath $script:PSScripts -TargetPath (Join-Path -Path $script:netPShome -ChildPath 'Scripts')
-        }
-        else
-        {
+        } else {
             Write-Warning -Message "Failed to locate mapped path $script:netPShome. Try re-running Mount-Path function."
         }
 
-        foreach ($module in $MyModules)
-        {
+        foreach ($module in $MyModules) {
             Write-Output -InputObject "Merging $module (locally)" | Tee-Object -FilePath $script:logFile -Append
             Merge-Repository -SourcePath $((Get-Module -Name $module -ListAvailable | Select-Object -Unique).ModuleBase) -TargetPath $env:USERPROFILE\Documents\GitHub\$module
         }
@@ -507,23 +481,18 @@ function Merge-MyPSFiles
         Merge-Repository -SourcePath $script:PSScripts -TargetPath $script:ghMyScripts
         
         # While we're at it merge primary profile script
-        if (Test-Path -Path $PROFILE)
-        {
+        if (Test-Path -Path $PROFILE) {
             $script:ScriptSourcePath = Resolve-Path -Path $(($PROFILE | Get-ChildItem).FullName)
             $script:ScriptTargetPath = Join-Path -Path $script:ghMyScripts -ChildPath $(($PROFILE | Get-ChildItem).Name)
 
             # Diff/Merge or copy the file
-            if (Test-Path -Path $script:ScriptTargetPath -ErrorAction Stop)
-            {
+            if (Test-Path -Path $script:ScriptTargetPath -ErrorAction Stop) {
                 Write-Verbose -Message "Merging profile script to $script:ScriptTargetPath" | Tee-Object -FilePath $script:logFile -Append
                 # Get file hashes and compare. If the hashes match, Compare-Object returns $false, so invert desired boolean using -not 
-                if ( -not [bool](Compare-Object -ReferenceObject (get-filehash -Path $script:ScriptSourcePath) (get-filehash -Path $script:ScriptTargetPath) -Property Hash))
-                {
+                if ( -not [bool](Compare-Object -ReferenceObject (get-filehash -Path $script:ScriptSourcePath) (get-filehash -Path $script:ScriptTargetPath) -Property Hash)) {
                     Write-Verbose -Message "Merging profile script $script:ScriptSourcePath" | Tee-Object -FilePath $script:logFile -Append
                     Merge-Repository -SourcePath $script:ScriptSourcePath -TargetPath $script:ScriptTargetPath
-                }
-                else
-                {
+                } else {
                     Write-Output -InputObject "File hashes match; no action needed." | Tee-Object -FilePath $script:logFile -Append
                 }
             }
@@ -531,17 +500,13 @@ function Merge-MyPSFiles
             $script:ScriptTargetPath = Join-Path -Path $script:netPShome -ChildPath $(($PROFILE | Get-ChildItem).Name)
 
             # Diff/Merge or copy the file
-            if (Test-Path -Path $script:ScriptTargetPath -ErrorAction Stop)
-            {
+            if (Test-Path -Path $script:ScriptTargetPath -ErrorAction Stop) {
                 Write-Verbose -Message "Merging profile script to $script:ScriptTargetPath" | Tee-Object -FilePath $script:logFile -Append
                 # Get file hashes and compare. If the hashes match, Compare-Object returns $false, so invert desired boolean using -not 
-                if ( -not [bool](Compare-Object -ReferenceObject (get-filehash -Path $script:ScriptSourcePath) (get-filehash -Path $script:ScriptTargetPath) -Property Hash))
-                {
+                if ( -not [bool](Compare-Object -ReferenceObject (get-filehash -Path $script:ScriptSourcePath) (get-filehash -Path $script:ScriptTargetPath) -Property Hash)) {
                     Write-Verbose -Message "Merging profile script $script:ScriptSourcePath" | Tee-Object -FilePath $script:logFile -Append
                     Merge-Repository -SourcePath $script:ScriptSourcePath -TargetPath $script:ScriptTargetPath
-                }
-                else
-                {
+                } else {
                     Write-Output -InputObject "File hashes match; no action needed." | Tee-Object -FilePath $script:logFile -Append
                 }
             }

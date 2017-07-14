@@ -55,7 +55,12 @@ if ($Host.Version.Major -le 5) {
 
 Write-Output -InputObject 'Ensure this script is dot-sourced, to get access to it''s contained functions'
 
-Write-Verbose -Message 'Declaring function Get-PSEdit'
+# dot-source script file containing Add-PATH and related helper functions
+$RelativePath = Split-Path -Path (Resolve-Path -Path $MyScriptInfo.CommandPath -Relative) -Parent
+Write-Verbose -Message "Initializing $RelativePath\Edit-Path.ps1" -Verbose
+. $RelativePath\Edit-Path.ps1
+
+Write-Verbose -Message 'Declaring Function Get-PSEdit'
 Function Get-PSEdit {
     Write-Verbose -Message 'Getting environment variable PSEdit'
     if ($Env:PSEdit) {
@@ -68,14 +73,13 @@ Function Get-PSEdit {
     }
 }
 
-Write-Verbose -Message 'Declaring function Assert-PSEdit'
+Write-Verbose -Message 'Declaring Function Assert-PSEdit'
 Function Assert-PSEdit {
     [CmdletBinding()]
-    Param
-    (
+    Param (
         [Parameter(Position=0)]
-        [ValidateScript({Test-Path -Path $PSItem})]
-        $Path = 'H:\VSCode\bin\code.cmd'
+        [ValidateScript({Test-Path -Path (Resolve-Path -Path $PSItem)})]
+        $Path = (Resolve-Path -Path $HOME\VSCode\bin\code.cmd)
     )
 
     if ($Env:PSEdit) {
@@ -105,7 +109,7 @@ Function Assert-PSEdit {
             Write-Verbose -Message 'VS Code NOT found ... Checking if ISE is available'
             $PSISE = Join-Path -Path $PSHOME -ChildPath 'powershell_ise.exe' -Resolve
             if (Test-Path -Path $PSISE -PathType Leaf) {
-                Write-Verbose -Message 'Detected PS ISE is installed. Selecting as PowerShell Editor'
+                Write-Verbose -Message 'Detected PS ISE is installed.'
             }
         }
     }   
@@ -114,7 +118,8 @@ Function Assert-PSEdit {
         Write-Verbose -Message "Setting `$Env:PSEdit to `$vscode: $vscode"
         $Env:PSEdit = $vscode
     # Write-Debug -Message 'Failed to locate an available instance of VS code'
-    } elseif (Test-Path -Path $Path -PathType Leaf) {
+    } elseif (Test-Path -Path $(Resolve-Path -Path $Path) -PathType Leaf) {
+            $Path = Resolve-Path -Path $Path
             Write-Verbose -Message "Setting `$Env:PSEdit to Path (Parameter): $Path"
             $Env:PSEdit = $Path
         # } else {
@@ -123,12 +128,16 @@ Function Assert-PSEdit {
         Write-Verbose -Message "Setting `$Env:PSEdit to $PSISE"
         $Env:PSEdit = $PSISE
     }
+
+    # Check and update $Env:PATH to include path to code; some code extensions look for code in the PATH
+    Write-Verbose -Message "Adding $(Split-Path -Path $Env:PSEdit -Parent -Resolve) to `$Env:PATH"
+    # Send output from Add-Path to Null, so we don't have to read $Env:Path in the console
+    Add-Path (Split-Path -Path $Env:PSEdit -Parent -Resolve) | Out-Null
     return $Env:PSEdit
 }
 
-Write-Verbose -Message 'Declaring function Open-PSEdit'
+Write-Verbose -Message 'Declaring Function Open-PSEdit'
 function Open-PSEdit {
-    # [CmdletBinding()]
     <#
         Potential enhancements, as examples of code.exe / code-insiders.exe parameters
         --install-extension guosong.vscode-util --install-extension ms-vscode.PowerShell --install-extension Shan.code-settings-sync --install-extension wmaurer.change-case --install-extension DavidAnson.vscode-markdownlint
@@ -165,34 +174,49 @@ function Open-PSEdit {
         -v, --version               Print version.
         -h, --help                  Print usage.
     #>
-    # param (
-    #     [Parameter(Position=0)]
-    #     [array]
-    #     $ArgumentList = $args
-    # )
+    [CmdletBinding()]
+    param (
+        [Parameter(Position=0)]
+        [array]
+        $ArgumentList = $args
+    )
 
     if (-not $Env:PSEdit) {
         # If path to code.cmd is not yet known, use the supporting function Assert-PSEdit to establish it
+        Write-Verbose -Message '$Env:PSEdit is not yet defined. Invoking Assert-PSEdit.'
         Assert-PSEdit
     }
 
     if ($Env:PSEdit -NotLike "*powershell_ise.exe") {
-        $ArgsArray = @('-r')
+        $ArgsArray = @("--user-data-dir $(Join-Path -Path $HOME -Childpath 'VSCode')",'--reuse-window')
     }
 
-    if ($Args) {
+    if ($Args -or $ArgumentList) {
         # sanitize passed parameters ?
-        $ArgumentList = $args
+        Write-Verbose -Message 'Processing $args.'
+        #$ArgumentList = $args
         foreach ($token in @($ArgumentList -split ',')) {
-            # TODO add hygiene check for supported non-path arguments
-            #   if (test-path -Path $token -PathType Leaf)
-            #   {
-                $ArgsArray += $token
-            # {
+            Write-Debug -Message "Processing `$args token '$token'"
+            # TODO Enhance Advanced function with parameter validation to match code.cmd / code.exe
+            # Check for unescaped spaces in file path arguments
+            if ($token.Contains(' ')) {
+                if (Test-Path -Path $token) {
+                    Write-Debug -Message "Wrapping  `$args token (path) $token with double quotes"
+                    $token = """$token"""
+                } else {
+                    Write-Debug -Message "`$args token $token failed Test-Path, so NOT wrapping with double quotes"
+                    $token = $token
+                }
+            } else {
+                $token = $token
+            }
+            Write-Verbose -Message "Adding $token to `$ArgsArray"
+            $ArgsArray += $token
         }
+        Write-Verbose -Message "Results of processing `$args: $ArgsArray"
     }
-    Write-Output -InputObject "Launching $Env:PSEdit $ArgsArray"
-    Start-Process -NoNewWindow -FilePath $Env:PSEdit -ArgumentList $ArgsArray -Verbose
+    Write-Output -InputObject "Launching $Env:PSEdit $ArgsArray`n"
+    Start-Process -NoNewWindow -FilePath $Env:PSEdit -ArgumentList $ArgsArray
     # & "${env:CommonProgramFiles(x86)}\Microsoft VS Code Insiders\bin\code-insiders.cmd" $ArgsArray
 }
 

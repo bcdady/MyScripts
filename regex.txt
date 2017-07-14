@@ -1,0 +1,13 @@
+
+# Find / replace line-breaks from between Function {
+[F|f]unction\s+(\S+)[\s\n]+{ // Function $1 {
+
+# Find / replace line-breaks between ) {
+\)[\s\n]+{ // ) {
+
+# Find / replace line-breaks from between } else {
+}[\s\n]+else[\s\n]+{ // } else {
+
+# Find / replace line-breaks from between } elseif
+}[\s\n]+elseif[\s\n]+{ // } elseif {
+    

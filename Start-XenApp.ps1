@@ -161,6 +161,7 @@ function Start-XenApp {
     }
 
     # Process arguments
+    $Private:Arguments = ''
     if ($Script:XenApps.Keys -contains $Launch)
     {
         Write-Verbose -Message "Matched `$Launch ('$Launch') in `$XenApps.Keys"

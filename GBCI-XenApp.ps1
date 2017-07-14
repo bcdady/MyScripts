@@ -1,5 +1,5 @@
 #!/usr/local/bin/powershell
-#Requires -Version 3
+#Requires -Version 3 -Module Sperry
 # PowerShell $Profile supplement script
 # Bryan's GBCI / XenApp specific functions, aliases, and other conveniences, which don't belong directly in the profile script
 
@@ -39,15 +39,23 @@ function Open-Workfront
 {
   if ($Global:onServer)
   {
+    # pre-pending opening of Free to Focus in browser, as the workfront.com login is modal, and interrupts opening any other tabs in the same window
+    Write-Verbose -Message 'Clear out any old michaelhyatt.com cookies'
+    Clear-IECookie -cookieURI michaelhyatt.com
+
+    Write-Output -InputObject 'Open Michael Hyatt''s Free to Focus'
+    Start-Process -FilePath 'https://courses.michaelhyatt.com/freetofocus'
+
     #Write-Output -InputObject 'https://glacierbancorp.my.workfront.com/myWork'
     #Start-Process -FilePath 'https://glacierbancorp.my.workfront.com/myWork'
     Write-Output -InputObject 'Open Infrastructure Tactical Status Dashboard in Workfront'
     Start-Process -FilePath 'https://glacierbancorp.my.workfront.com/dashboard/view?ID=58bf1adf0033326baa80cd030c403397'
 
-<#    Write-Output -InputObject 'Open Workfront Training'
+  <#
+    Write-Output -InputObject 'Open Workfront Training'
     #Start-Process -FilePath 'https://support.workfront.com/hc/en-us/articles/230791047?flash_digest=6bde06cf5b5f875b78fb38f7aba34a24533971ab#Workfront'
     Start-Process -FilePath explorer.exe -ArgumentList 'S:\Everyone\Workfront Training'
-#>
+  #>
   }
 }
 
@@ -120,9 +128,7 @@ function xa_hdrive {
   {
     Write-Output -InputObject 'explorer.exe H:\'
     & explorer.exe 'H:\'
-  }
-  else
-  {
+  } else {
     # locally, via Receiver ...
     Write-Output -InputObject 'Start-XenApp -Qlaunch "H Drive"'
     Start-XenApp -Qlaunch 'H Drive'
@@ -138,9 +144,7 @@ function xa_IE
   {
     Write-Output -InputObject 'https://intranet2'
     Start-Process -FilePath 'https://intranet2'
-  }
-  else
-  {
+  } else {
     # locally, via Receiver ...
     Write-Output -InputObject 'Start-XenApp -Qlaunch "Internet Explorer"'
     Start-XenApp -Qlaunch 'Internet Explorer'
@@ -254,9 +258,7 @@ function xa_synergy_admin
   {
     Write-Output -InputObject 'Synergy Administration.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Synergy ECM\Synergy Administration.lnk"
-  }
-  else
-  {
+  } else {
     Write-Output -InputObject 'Start-XenApp -Qlaunch Synergy Admin'
     # Qlaunch via Receiver
     Start-XenApp -Qlaunch synergy 
@@ -269,9 +271,7 @@ function xa_visio
   {
     Write-Output -InputObject 'Microsoft Visio 2010.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Microsoft Office\Microsoft Visio 2010.lnk"
-  }
-  else
-  {
+  } else {
     Write-Output -InputObject 'Start-XenApp -Qlaunch visio'
     Start-XenApp -Qlaunch visio 
   }
@@ -282,9 +282,7 @@ function xa_word
   {
     Write-Output -InputObject 'Microsoft Word 2010.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Microsoft Office\Microsoft Word 2010.lnk"
-  }
-  else
-  {
+  } else {
     Write-Output -InputObject 'Start-XenApp -Qlaunch word'
     Start-XenApp -Qlaunch word
   }
@@ -295,9 +293,7 @@ function xa_adobe
   {
     Write-Output -InputObject 'Adobe Reader XI.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Adobe Reader XI.lnk"
-  }
-  else
-  {
+  } else {
     Write-Output -InputObject 'H:\Desktop\Palo Alto Enterprise Security for Financial Services.PDF'
     & 'H:\Desktop\Palo Alto Enterprise Security for Financial Services.PDF'
   }
@@ -334,17 +330,15 @@ function Start-MyXenApps
   Write-Output -InputObject 'Starting Skype for Business'
   xa_skype
   Start-Sleep -Seconds 6
-  Write-Output -InputObject"Setting GC92IT250 as default printer "
-  # Set-Printer -printerShareName GC92IT250
-  set-printer -printerShareName 'GC92IT250_(Grayscale)'
+  Write-Output -InputObject"Setting GC92IT250_(Grayscale) as default printer "
+  Set-Printer -printerShareName 'GC92IT250_(Grayscale)'
   Start-Sleep -Milliseconds 250
   get-printer -Default
   Start-Sleep -Seconds 1
+  sndvol.exe
+
   Write-Output -InputObject 'Starting OneNote'
   xa_onenote
-  Start-Sleep -Seconds 5
-  Write-Output -InputObject 'Starting Outlook'
-  xa_outlook
   Start-Sleep -Seconds 3
   Write-Output -InputObject 'Opening Assyst, ITSC, and Workfront (in default browser)'
   xa_itsc
@@ -352,12 +346,16 @@ function Start-MyXenApps
   xa_assyst
   Start-Sleep -Seconds 1
   open-workfront
+  Start-Sleep -Seconds 30
+  Write-Output -InputObject 'Starting Outlook'
+  xa_outlook
+  $HOME\Downloads\pocket.exe
 }
 
 Write-Verbose -Message 'Checking if work apps should be auto-started'
 $thisHour = (Get-Date -DisplayHint Time).Hour
 Write-Debug -Message "(-not [bool](Get-ProcessByUser -ProcessName 'outlook.exe'))"
-if (($thisHour -ge 6) -and ($thisHour -le 18) -and ($Global:onServer) -and (-not [bool](Get-ProcessByUser -ProcessName 'outlook.exe')))
+if (($thisHour -ge 6) -and ($thisHour -le 18) -and ($Global:onServer) -and (-not [bool](Get-ProcessByUser -ProcessName 'outlook.exe' -ErrorAction Ignore)) -and (Get-ProcessByUser -ProcessName 'VDARedirector.exe' -ErrorAction Ignore))
 {
   Write-Verbose -Message 'Starting work apps'
   Write-output -InputObject ' # Default Printer # :'
@@ -365,4 +363,9 @@ if (($thisHour -ge 6) -and ($thisHour -le 18) -and ($Global:onServer) -and (-not
   
   Write-output -InputObject 'Start-MyXenApps'
   Start-MyXenApps
+} else {
+  Write-Verbose -Message "`$thisHour: $thisHour"
+  Write-Verbose -Message "`$Global:onServer : $Global:onServer"
+  Write-Verbose -Message "Get-ProcessByUser -ProcessName 'outlook.exe': $([bool](Get-ProcessByUser -ProcessName 'outlook.exe' -ErrorAction Ignore))"
+  Write-Verbose -Message "Get-ProcessByUser -ProcessName 'VDARedirector.exe': $([bool](Get-ProcessByUser -ProcessName 'VDARedirector.exe' -ErrorAction Ignore))"
 }

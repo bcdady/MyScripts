@@ -1,12 +1,61 @@
-﻿#requires -Version 3 -Modules PSLogger, Sperry
-<#
-    Author: Bryan Dady
-    Version: 1.0.3
-    Version History: Created Get-NetSite function as an enhancement on the Get-IPAddress function
-    2015/7/23 (1.0.3) : Add 10.92.x.x / 10.9n.x.x handling
-    Purpose: Provide location/context information for a corporate network
-#>
+﻿#!/usr/local/bin/powershell
+#requires -Version 3 -Modules PSLogger, Sperry
+#========================================
+# NAME      : NetSiteName.ps1
+# LANGUAGE  : Windows PowerShell
+# AUTHOR    : Bryan Dady
+# UPDATED   : 07/7/2017
+# COMMENT   : Created Get-NetSite function as an enhancement on the Get-IPAddress function. Provide location/context information for a corporate network.
+# HISTORY   : 2017/07/07 Endhanced script format/structure, such as this header block and #Region MyScriptInfo
+# HISTORY   : 2015/7/23 (1.0.3) : Add 10.92.x.x / 10.9n.x.x handling
+#========================================
+[CmdletBinding()]
+param ()
+Set-StrictMode -Version latest
 
+#Region MyScriptInfo
+    Write-Verbose -Message '[NetSiteName] Populating $MyScriptInfo'
+    $script:MyCommandName = $MyInvocation.MyCommand.Name
+    $script:MyCommandPath = $MyInvocation.MyCommand.Path
+    $script:MyCommandType = $MyInvocation.MyCommand.CommandType
+    $script:MyCommandModule = $MyInvocation.MyCommand.Module
+    $script:MyModuleName = $MyInvocation.MyCommand.ModuleName
+    $script:MyCommandParameters = $MyInvocation.MyCommand.Parameters
+    $script:MyParameterSets = $MyInvocation.MyCommand.ParameterSets
+    $script:MyRemotingCapability = $MyInvocation.MyCommand.RemotingCapability
+    $script:MyVisibility = $MyInvocation.MyCommand.Visibility
+
+    if (($null -eq $script:MyCommandName) -or ($null -eq $script:MyCommandPath)) {
+        # We didn't get a successful command / script name or path from $MyInvocation, so check with CallStack
+        Write-Verbose -Message "Getting PSCallStack [`$CallStack = Get-PSCallStack]"
+        $CallStack = Get-PSCallStack | Select-Object -First 1
+        # $CallStack | Select Position, ScriptName, Command | format-list # FunctionName, ScriptLineNumber, Arguments, Location
+        $script:myScriptName = $CallStack.ScriptName
+        $script:myCommand = $CallStack.Command
+        Write-Verbose -Message "`$ScriptName: $script:myScriptName"
+        Write-Verbose -Message "`$Command: $script:myCommand"
+        Write-Verbose -Message 'Assigning previously null MyCommand variables with CallStack values'
+        $script:MyCommandPath = $script:myScriptName
+        $script:MyCommandName = $script:myCommand
+    }
+
+    #'Optimize New-Object invocation, based on Don Jones' recommendation: https://technet.microsoft.com/en-us/magazine/hh750381.aspx
+    $Private:properties = [ordered]@{
+        'CommandName'        = $script:MyCommandName
+        'CommandPath'        = $script:MyCommandPath
+        'CommandType'        = $script:MyCommandType
+        'CommandModule'      = $script:MyCommandModule
+        'ModuleName'         = $script:MyModuleName
+        'CommandParameters'  = $script:MyCommandParameters.Keys
+        'ParameterSets'      = $script:MyParameterSets
+        'RemotingCapability' = $script:MyRemotingCapability
+        'Visibility'         = $script:MyVisibility
+    }
+    $MyScriptInfo = New-Object -TypeName PSObject -Prop $properties
+    Write-Verbose -Message '[NetSiteName] $MyScriptInfo populated'
+#End Region
+
+Write-Verbose -Message 'Declaring Function Get-NetSite'
 function Get-NetSite
 {
     <#
@@ -38,6 +87,9 @@ function Get-NetSite
         .OUTPUTS
             Write-Log
     #>
+    [CmdletBinding()]
+    param ()
+    
     Get-IPAddress | ForEach-Object -Process {
         # Is there a better way to make this a lookup, e.g. from an Array ... that could be referenced in JSON or CSV?
         switch -Regex ($PSItem.IPAddress) {
