@@ -1,12 +1,12 @@
 #!/usr/local/bin/powershell
 #Requires -Version 3
+# ~/.config/powershell/Microsoft.PowerShell_profile.ps1
 #========================================
 # NAME      : Microsoft.PowerShell_profile.ps1
 # LANGUAGE  : Windows PowerShell
 # AUTHOR    : Bryan Dady
-# UPDATED   : 06/22/2017
-# COMMENT   : Originally created by New-Profile cmdlet in ProfilePal Module; modified for ps-core compatibility (use on Mac) by @bcdady 2016-09-27
-# ~/.config/powershell/Microsoft.PowerShell_profile.ps1
+# UPDATED   : 07/30/2017
+# COMMENT   : Incorporate new module ConsoleTheme functions, with Set-Theme Function
 #========================================
 [CmdletBinding(SupportsShouldProcess)]
 param ()
@@ -67,13 +67,13 @@ if ($IsWindows) {
   $hostOSCaption =  $((Get-CimInstance -ClassName Win32_OperatingSystem -Property Caption).Caption) -replace 'Microsoft ',''
 }
 
-if ((Get-Variable -Name IsLinux -ErrorAction Ignore) -eq $true) {
+if ((Get-Variable -Name IsLinux -ValueOnly -ErrorAction SilentlyContinue) -eq $true) {
   $hostOS = 'Linux'
   $hostOSCaption = $hostOS
 } 
 
-if ((Get-Variable -Name IsOSX -ErrorAction Ignore) -eq $true) { 
-  $hostOS = 'OSX'
+if ((Get-Variable -Name IsOSX -ValueOnly -ErrorAction SilentlyContinue) -eq $true) { 
+  $hostOS = 'MacOS'
   $hostOSCaption = $hostOS
 } 
 
@@ -84,9 +84,8 @@ Write-Output -InputObject " # $ShellId $($Host.version.toString().substring(0,3)
 Write-Verbose -Message "Setting environment HostOS to $hostOS"
 $env:HostOS = $hostOS
 
+Get-Variable -Name Is* -Exclude ISERecent | Format-Table -AutoSize
 <#
-  Get-Variable -Name Is* -Exclude ISERecent | Format-Table -AutoSize
-  <#
   Name                           Value
   ----                           -----
   IsCoreCLR                      True
@@ -100,10 +99,12 @@ Write-Output -InputObject "`nCurrent PS execution policy is: "
 Get-ExecutionPolicy -List | Format-Table -AutoSize
 
 $Global:onServer = $false
-if ((Get-WmiObject -Class Win32_OperatingSystem -Property Caption).Caption -like '*Windows Server*') {
+if ($hostOSCaption -like '*Windows Server*') {
   $Global:onServer = $true
 }
 
+<#
+Make this more cross-platform / Core friendly
 # Try to update PS help files, if we have local admin rights
 # Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
 if (([security.principal.windowsprincipal] [security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
@@ -119,10 +120,10 @@ if (([security.principal.windowsprincipal] [security.principal.windowsidentity]:
   }
 }
 # else ... if not local admin, we don't have permissions to update help files.
+#>
 
 $global:LearnPowerShell = $false
-if ($IsWindows -and (-not (Get-Variable -Name LearnPowerShell -Scope Global -ValueOnly -ErrorAction Ignore)))
-{
+if ($IsWindows -and (-not (Get-Variable -Name LearnPowerShell -Scope Global -ValueOnly -ErrorAction Ignore))) {
   # Learn PowerShell today ...
   # Thanks for this tip goes to: http://jdhitsolutions.com/blog/essential-powershell-resources/
   Write-Verbose -Message ' # selecting (2) random PowerShell cmdlet help to review #'
@@ -148,22 +149,22 @@ $PSDefaultParameterValues['Install-Module:Scope'] = 'CurrentUser'
 #>
 
 # Derive full path to user's PowerShell folder
-if ($IsWindows) {
-  $myPSHome = $(Join-Path -Path "$([Environment]::GetFolderPath('MyDocuments'))" -ChildPath 'WindowsPowerShell')
-  if (($onServer) -or ($myPSHome -like '\\*')) {
-    # Detect UNC format in $myPSHome and replace with PDrive Name
-    foreach ($root in $(Get-PSDrive -PSProvider FileSystem | Where-Object -FilterScript { $null -ne $_.DisplayRoot })) {
-      Write-Debug -Message "$myPSHome -like $($root.DisplayRoot) : $($myPSHome -like $($root.DisplayRoot)+'*')"
-      if ($myPSHome  -like $($root.DisplayRoot)+'*') {
-        Write-Verbose -Message "Matched my PowerShell path to $($root.Name) ($($root.DisplayRoot))" -Verbose
-        $myPSHome = Resolve-Path -Path $($myPSHome -replace $(($root.DisplayRoot -replace '\\', '\\')  -replace '\$', '\$'), $($root.Root))
-      }
-    }
-  }
-} else {
+# if ($IsWindows) {
+#   $myPSHome = $(Join-Path -Path "$([Environment]::GetFolderPath('MyDocuments'))" -ChildPath 'WindowsPowerShell')
+#   if (($onServer) -or ($myPSHome -like '\\*')) {
+#     # Detect UNC format in $myPSHome and replace with PDrive Name
+#     foreach ($root in $(Get-PSDrive -PSProvider FileSystem | Where-Object -FilterScript { $null -ne $_.DisplayRoot })) {
+#       Write-Debug -Message "$myPSHome -like $($root.DisplayRoot) : $($myPSHome -like $($root.DisplayRoot)+'*')"
+#       if ($myPSHome  -like $($root.DisplayRoot)+'*') {
+#         Write-Verbose -Message "Matched my PowerShell path to $($root.Name) ($($root.DisplayRoot))" -Verbose
+#         $myPSHome = Resolve-Path -Path $($myPSHome -replace $(($root.DisplayRoot -replace '\\', '\\')  -replace '\$', '\$'), $($root.Root))
+#       }
+#     }
+#   }
+# } else {
   # Need to determine / test how to properly do this on non-windows OS
-  $myPSHome = $HOME
-}
+  $myPSHome = split-path -path $PROFILE #$HOME
+#}
 
 #Write-Verbose -Message "PowerShell profile root (`$myPSHome) is:  $myPSHome"
 Write-Verbose -Message "`$myPSHome is $myPSHome"
@@ -182,29 +183,49 @@ if ($IsWindows) {
     Set-Variable -Name HOME -Value $(Split-Path -Path $myPSHome -Parent) -Force
   }
 
-  #Define modules and scripts folders within user's PowerShell folder, creating the SubFolders if necessary
+    #Define modules and scripts folders within user's PowerShell folder
   $myPSModPath = (Join-Path -Path $myPSHome -ChildPath 'Modules')
-  if (-not (Test-Path -Path $myPSModPath)) {
-    New-Item -Path $myPSHome -ItemType Directory -Name 'Modules'
-  }
-
   $myScriptsPath = (Join-Path -Path $myPSHome -ChildPath 'Scripts')
-  if (-not (Test-Path -Path $myScriptsPath)) {
-    New-Item -Path $myPSHome -ItemType Directory -Name 'Scripts'
-  }
+
 } else {
   $splitChar = ':'
-  if (-not (Test-Path -Path $HOME)) {
-    Write-Verbose -Message 'Setting $HOME to $myPSHome'
-    Set-Variable -Name HOME -Value $(Split-Path -Path $myPSHome -Parent) -Force
-  }
+  # if (-not (Test-Path -Path $HOME)) {
+  #   Write-Verbose -Message 'Setting $HOME to $myPSHome'
+  #   Set-Variable -Name HOME -Value $(Split-Path -Path $myPSHome -Parent) -Force
+  # }
 
   $myPSModPath = (Join-Path -Path $HOME -ChildPath '.local/share/powershell/Modules') # OR /usr/local/share/powershell/Modules
   $myScriptsPath = (Join-Path -Path $HOME -ChildPath '.local/share/powershell/Scripts')
 }
 
+# Create the Path items, if necessary
+if (-not (Test-Path -Path $myPSModPath)) {
+  New-Item -Path $myPSHome -ItemType Directory -Name 'Modules'
+  Write-Warning -Message 'FYI - The newly created Scripts directory is empty'
+}
+
+if (-not (Test-Path -Path $myScriptsPath)) {
+  New-Item -Path $myPSHome -ItemType Directory -Name 'Scripts'
+  Write-Warning -Message 'FYI - The newly created Scripts directory is empty'
+}
+
+# Locate MyScripts Repository, to copy from later, if needed
+if (Join-Path -Path $HOME -ChildPath '*/MyScripts' -Resolve) {
+  $MyScriptsRepo = Join-Path -Path $HOME -ChildPath '*/MyScripts' -Resolve
+}
+
 Write-Verbose -Message "My PS Modules Path: $myPSModPath"
 Write-Verbose -Message "My PS Scripts Path: $myScriptsPath"
+
+# From recent $PROFILE posted to github.com/PowerShell
+if ($IsWindows)
+{
+	# Add Windows PowerShell PSModulePath to make it easier to discover potentially compatible PowerShell modules
+	# If a Windows PowerShell module works or not, please provide feedback at https://github.com/PowerShell/PowerShell/issues/4062
+
+	Write-Warning "Appended Windows PowerShell PSModulePath"
+	$env:psmodulepath += ";${env:userprofile}\Documents\WindowsPowerShell\Modules;${env:programfiles}\WindowsPowerShell\Modules;${env:windir}\system32\WindowsPowerShell\v1.0\Modules\"
+}
 
 Write-Debug -Message "($myPSModPath -in @(`$env:PSMODULEPATH -split $splitChar)"
 Write-Debug -Message ($myPSModPath -in @($env:PSMODULEPATH -split $splitChar))
@@ -215,8 +236,9 @@ if (($null -ne $myPSModPath) -and (-not ($myPSModPath -in @($env:PSMODULEPATH -s
   $env:PSMODULEPATH += "$splitChar$myPSModPath"
 
   # post-update cleanup
-  if (Test-Path -Path $myScriptsPath) {
-    & $myScriptsPath\Cleanup-ModulePath.ps1
+  $CleanModPathScript = Join-Path -Path $myScriptsPath -ChildPath 'Cleanup-ModulePath.ps1'
+  if (Test-Path -Path $CleanModPathScript) {
+    & $CleanModPathScript
     $env:PSMODULEPATH
   }
 }
@@ -233,7 +255,7 @@ New-Alias -Name GoTo-Sleep -Value Invoke-WinSleep -ErrorAction Ignore
 New-Alias -Name Sleep-PC -Value Invoke-WinSleep -ErrorAction Ignore
 
 # Client-only tweaks(s) ...
-if (-not $onServer) {
+if ($Global:IsWindows -and (-not $onServer)) {
   # "Fix" task bar icon grouping
   # I sure wish there was an API for this so I didn't have to restart explorer
   Write-Verbose -Message 'Checking Task Bar buttons display preference'
@@ -252,48 +274,95 @@ if (($variable:myScriptsPath) -and (Test-Path -Path $myScriptsPath -PathType Con
 
     $atWork = $false
     # [bool]($NetInfo.IPAddress -match "^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$") -or
-    if (Test-Connection -ComputerName $env:USERDNSDOMAIN -Quiet) {
-      $atWork = $true
-    }
-
-  Write-Verbose -Message ' ... loading NetSiteName.ps1'
-    # dot-source script file containing Get-NetSite function
-  . $myScriptsPath\NetSiteName.ps1
-
-  Write-Verbose -Message '     Getting $NetInfo (IPAddress, SiteName)'
-  # Get network / site info
-    $NetInfo = Get-NetSite | Select-Object -Property IPAddress, SiteName -ErrorAction Stop
-    if ($NetInfo) {
-      if ($atWork) {
-        Write-Output -InputObject "Connected at work site: $($NetInfo.SiteName) (Address: $($NetInfo.IPAddress))" # | Select-Object -First 1))"
-      } else {
-        Write-Output -InputObject "Connected at remote site: $($NetInfo.SiteName) (Address: $($NetInfo.IPAddress))" # | Select-Object -First 1))"
+    if ($Global:IsWindows -and (-not $onServer)) {
+      if (Test-Connection -ComputerName $env:USERDNSDOMAIN -Quiet) {
+        $atWork = $true
       }
-    } else {
-      Write-Warning -Message "Failed to enumerate Network Site Info: $NetInfo" # | Select-Object -First 1))"
+
+      Write-Verbose -Message ' ... loading NetSiteName.ps1'
+        # dot-source script file containing Get-NetSite function
+      . (Join-Path -Path $myScriptsPath -ChildPath 'NetSiteName.ps1')
+
+      Write-Verbose -Message '     Getting $NetInfo (IPAddress, SiteName)'
+      # Get network / site info
+      $NetInfo = Get-NetSite | Select-Object -Property IPAddress, SiteName -ErrorAction Stop
+      if ($NetInfo) {
+        if ($atWork) {
+          Write-Output -InputObject "Connected at work site: $($NetInfo.SiteName) (Address: $($NetInfo.IPAddress))" # | Select-Object -First 1))"
+        } else {
+          Write-Output -InputObject "Connected at remote site: $($NetInfo.SiteName) (Address: $($NetInfo.IPAddress))" # | Select-Object -First 1))"
+        }
+      } else {
+        Write-Warning -Message "Failed to enumerate Network Site Info: $NetInfo" # | Select-Object -First 1))"
+      }
     }
 
   # dot-source script file containing Get-MyNewHelp function
+  if (-not (Test-Path -Path $myScriptsPath\Get-MyNewHelp.ps1)) {
+    Copy-Item -Path (Join-Path -Path $MyScriptsRepo -ChildPath 'Get-MyNewHelp.ps1') -Destination $myScriptsPath -PassThru
+    # and make sure the new file is X
+    & chmod +x (Join-Path -Path $myScriptsPath -ChildPath 'Open-PSEdit.ps1')
+  }
   Write-Verbose -Message 'Initializing Get-MyNewHelp.ps1'
   . $myScriptsPath\Get-MyNewHelp.ps1 -Verbose
   
   # dot-source script file containing Merge-Repository and helper Merge-MyPSFiles functions
+  if (-not (Test-Path -Path $myScriptsPath\PowerDiff.ps1)) {
+    Copy-Item -Path (Join-Path -Path $MyScriptsRepo -ChildPath 'PowerDiff.ps1') -Destination $myScriptsPath -PassThru
+    # and make sure the new file is X
+    & chmod +x (Join-Path -Path $myScriptsPath -ChildPath 'Open-PSEdit.ps1')
+  }
   Write-Verbose -Message 'Initializing PowerDiff.ps1'
-  . $myScriptsPath\PowerDiff.ps1
+  . (Join-Path -Path $myScriptsPath -ChildPath 'PowerDiff.ps1')
 
   # dot-source script file containing psEdit (Open-PSEdit) and supporting functions
+  if (-not (Test-Path -Path $myScriptsPath\Open-PSEdit.ps1)) {
+    Copy-Item -Path (Join-Path -Path $MyScriptsRepo -ChildPath 'Open-PSEdit.ps1') -Destination $myScriptsPath -PassThru
+    # and make sure the new file is X
+    & chmod +x (Join-Path -Path $myScriptsPath -ChildPath 'Open-PSEdit.ps1')
+  }
+  if (-not (Test-Path -Path $myScriptsPath\Edit-Path.ps1)) {
+    Copy-Item -Path (Join-Path -Path $MyScriptsRepo -ChildPath 'Edit-Path.ps1') -Destination $myScriptsPath -PassThru
+    # and make sure the new file is X
+    & chmod +x (Join-Path -Path $myScriptsPath -ChildPath 'Edit-Path.ps1')
+  }
   Write-Verbose -Message 'Initializing Open-PSEdit.ps1'
-  . $myScriptsPath\Open-PSEdit.ps1
-  . $myScriptsPath\Save-VSCodePrefs.ps1
+  . (Join-Path -Path $myScriptsPath -ChildPath 'Open-PSEdit.ps1')
 
-  # dot-source script file containing Citrix XenApp functions
-  Write-Verbose -Message 'Initializing Start-XenApp.ps1'
-  . $myScriptsPath\Start-XenApp.ps1
+  if ($hostOS -eq 'MacOS') {
+    # import the ConsoleTheme module, ... 
+    # dot-source and run Set-ConsoleTheme
+    if (-not (Test-Path -Path (Join-Path -Path $myPSModPath -ChildPath 'ConsoleTheme'))) {
+      Copy-Item -Path (Join-Path -Path (Split-Path -Path $MyScriptsRepo) -ChildPath 'ConsoleTheme') -Destination $myPSModPath -Container -Recurse -PassThru
+    }
 
-  # dot-source script file containing my XenApp functions
-  Write-Verbose -Message 'Initializing GBCI-XenApp.ps1'
-  . $myScriptsPath\GBCI-XenApp.ps1
-  
+    if (-not (Test-Path -Path $myScriptsPath\Set-ConsoleTheme.ps1)) {
+      Copy-Item -Path (Join-Path -Path $MyScriptsRepo -ChildPath 'Set-ConsoleTheme.ps1') -Destination $myScriptsPath -PassThru
+    # and make sure the new file is X
+    & chmod +x (Join-Path -Path $myScriptsPath -ChildPath 'Set-ConsoleTheme.ps1')
+    }
+    Write-Verbose -Message 'Initializing Set-ConsoleTheme.ps1'
+    . (Join-Path -Path $myScriptsPath -ChildPath 'Set-ConsoleTheme.ps1')
+    Write-Verbose -Message 'Set-ConsoleTheme'
+    Set-ConsoleTheme
+      
+  }
+
+  if ($atWork) {
+    # dot-source script file containing Citrix XenApp functions
+    if (-not (Test-Path -Path $myScriptsPath\Start-XenApp.ps1)) {
+      Copy-Item -Path (Join-Path -Path $MyScriptsRepo -ChildPath 'Start-XenApp.ps1') -Destination $myScriptsPath -PassThru
+    }
+    Write-Verbose -Message 'Initializing Start-XenApp.ps1'
+    . (Join-Path -Path $myScriptsPath -ChildPath 'Start-XenApp.ps1')
+
+    # dot-source script file containing my XenApp functions
+    if (-not (Test-Path -Path $myScriptsPath\GBCI-XenApp.ps1)) {
+      Copy-Item -Path (Join-Path -Path $MyScriptsRepo -ChildPath 'GBCI-XenApp.ps1') -Destination $myScriptsPath -PassThru
+    }
+    Write-Verbose -Message 'Initializing GBCI-XenApp.ps1'
+    . (Join-Path -Path $myScriptsPath -ChildPath 'GBCI-XenApp.ps1')
+  }
 } else {
   Write-Warning -Message "Failed to locate Scripts folder $myScriptsPath; run any scripts."
 }
@@ -433,6 +502,8 @@ if ($atWork)
     Set-Workplace -Zone Office
   }
 } else {
-  Dismount-Path
-  Write-Output -InputObject 'Work network not detected. Run ''Set-Workplace -Zone Remote'' to switch modes.'
+  if ($Global:IsWindows) {
+    Dismount-Path
+    Write-Output -InputObject 'Work network not detected. Run ''Set-Workplace -Zone Remote'' to switch modes.'
+  }
 }
