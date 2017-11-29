@@ -1,0 +1,171 @@
+{
+    "json_description": "Define preference and configurations for PowerDiff.ps1.",
+    "author": "bdady",
+    "version": "1.0.0",
+    "updated": "08-18-2017",
+    "DiffTool": {
+        "Name": "Kdiff",
+        "Path": "R:\\IT\\Utilities\\KDiff3\\kdiff3.exe",
+        "Options": [
+            {
+                "Setting": "AutoAdvance",
+                "Value": "1"
+            },
+            {
+                "Setting": "AutoSaveAndQuitOnMergeWithoutConflicts",
+                "Value": "1"
+            },
+            {
+                "Setting": "BinaryComparison",
+                "Value": "0"
+            },
+            {
+                "Setting": "CreateBakFiles",
+                "Value": "1"
+            },
+            {
+                "Setting": "DirAntiPattern",
+                "Value": "CVS;.deps;.svn;.git;.hg"
+            },
+            {
+                "Setting": "EscapeKeyQuits",
+                "Value": "1"
+            },
+            {
+                "Setting": "FileAntiPattern",
+                "Value": "*.orig;*.o;*.ob`;.git*;*.zip;copy-module.ps1;README.md"
+            },
+            {
+                "Setting": "FullAnalysis",
+                "Value": "1"
+            },
+            {
+                "Setting": "IgnoreCase",
+                "Value": "0"
+            },
+            {
+                "Setting": "IgnoreComments",
+                "Value": "0"
+            },
+            {
+                "Setting": "IgnoreNumbers",
+                "Value": "0"
+            },
+            {
+                "Setting": "RecursiveDirs",
+                "Value": "0"
+            },
+            {
+                "Setting": "ReplaceTabs",
+                "Value": "1"
+            },
+            {
+                "Setting": "RunRegExpAutoMergeOnMergeStart",
+                "Value": "1"
+            },
+            {
+                "Setting": "SameEncoding",
+                "Value": "1"
+            },
+            {
+                "Setting": "ShowIdenticalFiles",
+                "Value": "0"
+            },
+            {
+                "Setting": "ShowInfoDialogs",
+                "Value": "0"
+            },
+            {
+                "Setting": "ShowLineNumbers",
+                "Value": "1"
+            },
+            {
+                "Setting": "ShowWhiteSpace",
+                "Value": "0"
+            },
+            {
+                "Setting": "ShowWhiteSpaceCharacters",
+                "Value": "1"
+            },
+            {
+                "Setting": "SyncMode",
+                "Value": "1"
+            },
+            {
+                "Setting": "TrustDate",
+                "Value": "0"
+            },
+            {
+                "Setting": "TrustDateFallbackToBinary",
+                "Value": "0"
+            },
+            {
+                "Setting": "TrustSize",
+                "Value": "0"
+            },
+            {
+                "Setting": "TryHard",
+                "Value": "1"
+            },
+            {
+                "Setting": "WhiteSpaceEqual",
+                "Value": "0"
+            },
+            {
+                "Setting": "WindowStateMaximised",
+                "Value": "1"
+            }
+        ]
+    },
+    "RepositorySets" : [
+        {
+            "Name": "my_scripts",
+            "SourcePath" : "C:\\Users\\bdady\\Documents\\WindowsPowerShell\\Scripts",
+            "TargetPath" : "H:\\My Documents\\WindowsPowerShell\\Scripts",
+            "MergePath"  : "",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "my_profilescript",
+            "SourcePath" : "C:\\Users\\bdady\\Documents\\WindowsPowerShell\\Microsoft.PowerShell_profile.ps1",
+            "TargetPath" : "H:\\My Documents\\WindowsPowerShell\\Microsoft.PowerShell_profile.ps1",
+            "MergePath"  : "",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "EditModule",
+            "SourcePath" : "H:\\My Documents\\WindowsPowerShell\\Modules\\EditModule",
+            "TargetPath" : "R:\\IT\\repo\\Modules\\EditModule",
+            "MergePath"  : "C:\\Users\\bdady\\Documents\\WindowsPowerShell\\Modules\\EditModule",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "Edit-Module",
+            "SourcePath" : "H:\\My Documents\\WindowsPowerShell\\Modules\\Edit-Module",
+            "TargetPath" : "R:\\IT\\repo\\Modules\\Edit-Module",
+            "MergePath"  : "C:\\Users\\bdady\\Documents\\WindowsPowerShell\\Modules\\Edit-Module",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "ProfilePal",
+            "SourcePath" : "H:\\My Documents\\WindowsPowerShell\\Modules\\ProfilePal",
+            "TargetPath" : "R:\\IT\\repo\\Modules\\ProfilePal",
+            "MergePath"  : "C:\\Users\\bdady\\Documents\\WindowsPowerShell\\Modules\\ProfilePal",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "PSLogger",
+            "SourcePath" : "H:\\My Documents\\WindowsPowerShell\\Modules\\PSLogger",
+            "TargetPath" : "R:\\IT\\repo\\Modules\\PSLogger",
+            "MergePath"  : "C:\\Users\\bdady\\Documents\\WindowsPowerShell\\Modules\\PSLogger",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "Sperry",
+            "SourcePath" : "H:\\My Documents\\WindowsPowerShell\\Modules\\Sperry",
+            "TargetPath" : "R:\\IT\\repo\\Modules\\Sperry",
+            "MergePath"  : "C:\\Users\\bdady\\Documents\\WindowsPowerShell\\Modules\\Sperry",
+            "OptionsOverride" : ""
+        }
+    ]
+}

@@ -1,71 +1,70 @@
 ﻿
-<#PSScriptInfo
+<#
+    #PSScriptInfo
 
-.VERSION 1.2
+    .VERSION 1.2
 
-.GUID efd8653f-3a23-4d78-a7d1-b766da9015bf
+    .GUID efd8653f-3a23-4d78-a7d1-b766da9015bf
 
-.AUTHOR Chris Carter
+    .AUTHOR Chris Carter
 
-.COMPANYNAME 
+    .COMPANYNAME 
 
-.COPYRIGHT ©2016 Chris Carter
+    .COPYRIGHT ©2016 Chris Carter
 
-.TAGS Active Directory, Last Logon Time
+    .TAGS Active Directory, Last Logon Time
 
-.LICENSEURI http://creativecommons.org/licenses/by-sa/4.0/
+    .LICENSEURI http://creativecommons.org/licenses/by-sa/4.0/
 
-.PROJECTURI https://gallery.technet.microsoft.com/Export-Last-Logon-Times-4fcb07cb
+    .PROJECTURI https://gallery.technet.microsoft.com/Export-Last-Logon-Times-4fcb07cb
 
-.ICONURI 
+    .ICONURI 
 
-.EXTERNALMODULEDEPENDENCIES 
+    .EXTERNALMODULEDEPENDENCIES 
 
-.REQUIREDSCRIPTS 
+    .REQUIREDSCRIPTS 
 
-.EXTERNALSCRIPTDEPENDENCIES 
+    .EXTERNALSCRIPTDEPENDENCIES 
 
-.RELEASENOTES The script was changed to remove the error message boxes, because I couldn't remember why it would use them in the first place.  Also, the script has been changed so that it now retrieves the LastLogon property from all domain controllers to find the most recent login time. 
-
-
+    .RELEASENOTES The script was changed to remove the error message boxes, because I couldn't remember why it would use them in the first place.  Also, the script has been changed so that it now retrieves the LastLogon property from all domain controllers to find the most recent login time. 
 #>
 
 <#
-.SYNOPSIS
-This script will export the account name and the last logon time of the users in the specified OU to a .csv file format at the specified destination.
+    .SYNOPSIS
+    This script will export the account name and the last logon time of the users in the specified OU to a .csv file format at the specified destination.
 
-.DESCRIPTION
-This script takes the OU common name specified in the OU parameter and retrieves its users' account names and last logon times.  Then it exports a .csv file to the destination given in the Destination parameter.  This script will search the entire domain for the OU name specified.  If you have OUs with the same names this script will most likely fail.  If the destination path contains spaces it must be wrapped in quotation marks, and the file name specified must end in .csv. 
- 
-Due to the common problem of the LastLogon not replicating between domain controllers, this script will search for domain controllers and compare the LastLogon from each one to find the most recent time a user logged in.
-.PARAMETER OrganizationalUnit
-Specifies the common name of the OU from which to retrieve users.  Do not enter the distinguished name of the OU, i.e. OU=Users,DC=example,DC=com.  The script will resolve the distinguished name.
+    .DESCRIPTION
+    This script takes the OU common name specified in the OU parameter and retrieves its users' account names and last logon times.  Then it exports a .csv file to the destination given in the Destination parameter.  This script will search the entire domain for the OU name specified.  If you have OUs with the same names this script will most likely fail.  If the destination path contains spaces it must be wrapped in quotation marks, and the file name specified must end in .csv. 
+    
+    Due to the common problem of the LastLogon not replicating between domain controllers, this script will search for domain controllers and compare the LastLogon from each one to find the most recent time a user logged in.
+    .PARAMETER OrganizationalUnit
+    Specifies the common name of the OU from which to retrieve users.  Do not enter the distinguished name of the OU, i.e. OU=Users,DC=example,DC=com.  The script will resolve the distinguished name.
 
-.PARAMETER Destination
-Specifies the location and file name of the exported csv file.  If you do not specify a full path, the current location will be used.  The file name must have a .csv extension specified.
+    .PARAMETER Destination
+    Specifies the location and file name of the exported csv file.  If you do not specify a full path, the current location will be used.  The file name must have a .csv extension specified.
 
-.INPUTS
-None.  You cannot pipe objects to Export-LastLogonTimes.ps1.
+    .INPUTS
+    None.  You cannot pipe objects to Export-LastLogonTimes.ps1.
 
-.OUTPUTS
-None.  Export-LastLogonTimes.ps1 does not generate any output.
+    .OUTPUTS
+    None.  Export-LastLogonTimes.ps1 does not generate any output.
 
-.EXAMPLE
-The following command will get the account name and last logon times for the OU named Users and export the information to a .csv file named LastLogon.csv in the Administrator's Documents folder.
+    .EXAMPLE
+    The following command will get the account name and last logon times for the OU named Users and export the information to a .csv file named LastLogon.csv in the Administrator's Documents folder.
 
-PS C:\> Export-LastLogonTimes -OU Users -Destination "C:\Users\administrator\Documents\LastLogon.csv"
+    PS C:\> Export-LastLogonTimes -OU Users -Destination "C:\Users\administrator\Documents\LastLogon.csv"
 
-.NOTES
-This script uses the ActiveDirectory PowerShell Module. This module is automatically installed on domain controllers and workstations or member servers that have installed the Remote Server Administration Tools (RSAT).  If you are not on a machine that meets this criteria, the script will fail to work.
+    .NOTES
+    This script uses the ActiveDirectory PowerShell Module. This module is automatically installed on domain controllers and workstations or member servers that have installed the Remote Server Administration Tools (RSAT).  If you are not on a machine that meets this criteria, the script will fail to work.
 
-.LINK
-Get-ADUser
-.LINK
-Get-ADObject
-.LINK
-Get-ADDomainController
-.LINK
-Export-Csv
+    .LINK
+    Get-ADUser
+    .LINK
+    Get-ADObject
+    .LINK
+    Get-ADDomainController
+    .LINK
+    Export-Csv
 #>
 
 #Binding for Common Parameters

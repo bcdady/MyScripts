@@ -1,42 +1,34 @@
+#requires -Module PoshRSJob
 <#PSScriptInfo
-.VERSION
-    0.0.1
-.GUID
-    8bbc7734-6854-4441-8022-dc394fa335ff
-.AUTHOR
-    Joshua (Windos) King
-.COMPANYNAME
-    king.geek.nz
-.COPYRIGHT
-    (c) 2016 Joshua (Windos) King. All rights reserved.
-.TAGS
-    DNS
-.PROJECTURI
-    https://github.com/Windos/powershell-depot/tree/master/GalleryScripts
-.RELEASENOTES
-* Initial release
+    .VERSION
+        0.0.1
+    .GUID
+        8bbc7734-6854-4441-8022-dc394fa335ff
+    .AUTHOR
+        Joshua (Windos) King
+    .COMPANYNAME
+        king.geek.nz
+    .COPYRIGHT
+        (c) 2016 Joshua (Windos) King. All rights reserved.
+    .TAGS
+        DNS
+    .PROJECTURI
+        https://github.com/Windos/powershell-depot/tree/master/GalleryScripts
+    .RELEASENOTES
+    * Initial release
 #>
-
-#Requires -Module PoshRSJob
-
 <#
-.SYNOPSIS
-Tests for potentially stale DNS records in a DNS Zone.
-
-.DESCRIPTION
-Script to test for potentially stale DNS records in a DNS Zone.
-
-Leverages PoshRSJob to test multiple records in parallel. 
-
-.EXAMPLE
-Test-DnsZone -Zone campus.example.com
-
-Tests all Host and Alias records in the 'Campus' DNS zone, and returns any that do not respond the an echo request.
-
-.EXAMPLE
-Test-DnsZone -Zone campus.example.com -all
-
-Tests all Host and Alias records in the 'Campus' DNS zone, and returns all records regardless of echo response.
+    .SYNOPSIS
+    Tests for potentially stale DNS records in a DNS Zone.
+    .DESCRIPTION
+    Script to test for potentially stale DNS records in a DNS Zone.
+    Leverages PoshRSJob to test multiple records in parallel. 
+    .EXAMPLE
+    Test-DnsZone -Zone campus.example.com
+    Tests all Host and Alias records in the 'Campus' DNS zone, and returns any that do not respond the an echo request.
+    .EXAMPLE
+    Test-DnsZone -Zone campus.example.com -all
+    Tests all Host and Alias records in the 'Campus' DNS zone, and returns all records regardless of echo response.
 #>
 
 [CmdletBinding(DefaultParameterSetName='Filtered')]
@@ -44,13 +36,11 @@ Tests all Host and Alias records in the 'Campus' DNS zone, and returns all recor
 Param
 (
     [Parameter(Position = 0,
-               Mandatory = $true)]
+               Mandatory)]
     [ValidateNotNullOrEmpty()]
     [string] $ZoneName,
-
     # Specifies that all records should be returned regardless of echo response
     [switch] $All,
-    
     [ValidateNotNullOrEmpty()]
     [string] $ComputerName = ((Get-ADDomainController -Discover -Service PrimaryDC).HostName)
 )
@@ -65,24 +55,19 @@ $ScriptBlock = {
 
 Import-Module -Name PoshRSJob
 
-try
-{
+try {
     Import-Module -Name DnsServer
 }
-catch
-{
+catch {
     throw 'Unable to load module ''DnsServer''. Please ensure you have installed and enabled the Remote Server Administation Tools (RSAT).'
 }
 
 $Records = Get-DnsServerResourceRecord -ComputerName $ComputerName -ZoneName $ZoneName | Where { $_.Type -in 1,5 }
 $Batch = "DnsTest-$(New-Guid)"
 
-if ($all)
-{
+if ($all) {
     $Records | Start-RSJob $ScriptBlock -Name {$_.HostName} -Throttle 20 -Batch $Batch | Wait-RSJob -ShowProgress | Receive-RSJob
-}
-else
-{
+} else {
     $Records | Start-RSJob $ScriptBlock -Name {$_.HostName} -Throttle 20 -Batch $Batch | Wait-RSJob -ShowProgress | Receive-RSJob | Where Echo -eq $false
 }
 
