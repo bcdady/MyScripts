@@ -8,15 +8,15 @@ Param()
 
 #Region MyScriptInfo
   Write-Verbose -Message '[Open-PSEdit] Populating $MyScriptInfo'
-  $script:MyCommandName = $MyInvocation.MyCommand.Name
-  $script:MyCommandPath = $MyInvocation.MyCommand.Path
-  $script:MyCommandType = $MyInvocation.MyCommand.CommandType
-  $script:MyCommandModule = $MyInvocation.MyCommand.Module
-  $script:MyModuleName = $MyInvocation.MyCommand.ModuleName
-  $script:MyCommandParameters = $MyInvocation.MyCommand.Parameters
-  $script:MyParameterSets = $MyInvocation.MyCommand.ParameterSets
+  $script:MyCommandName        = $MyInvocation.MyCommand.Name
+  $script:MyCommandPath        = $MyInvocation.MyCommand.Path
+  $script:MyCommandType        = $MyInvocation.MyCommand.CommandType
+  $script:MyCommandModule      = $MyInvocation.MyCommand.Module
+  $script:MyModuleName         = $MyInvocation.MyCommand.ModuleName
+  $script:MyCommandParameters  = $MyInvocation.MyCommand.Parameters
+  $script:MyParameterSets      = $MyInvocation.MyCommand.ParameterSets
   $script:MyRemotingCapability = $MyInvocation.MyCommand.RemotingCapability
-  $script:MyVisibility = $MyInvocation.MyCommand.Visibility
+  $script:MyVisibility         = $MyInvocation.MyCommand.Visibility
 
   if (($null -eq $script:MyCommandName) -or ($null -eq $script:MyCommandPath)) {
     # We didn't get a successful command / script name or path from $MyInvocation, so check with CallStack
@@ -25,8 +25,8 @@ Param()
     # $CallStack | Select Position, ScriptName, Command | format-list # FunctionName, ScriptLineNumber, Arguments, Location
     $script:myScriptName = $CallStack.ScriptName
     $script:myCommand = $CallStack.Command
-    Write-Verbose -Message "`$ScriptName: $script:myScriptName"
-    Write-Verbose -Message "`$Command: $script:myCommand"
+    Write-Verbose -Message ('$ScriptName: {0}' -f $script:myScriptName)
+    Write-Verbose -Message ('$Command: {0}' -f $script:myCommand)
     Write-Verbose -Message 'Assigning previously null MyCommand variables with CallStack values'
     $script:MyCommandPath = $script:myScriptName
     $script:MyCommandName = $script:myCommand
@@ -44,19 +44,18 @@ Param()
     'RemotingCapability' = $script:MyRemotingCapability
     'Visibility'         = $script:MyVisibility
   }
-  $MyScriptInfo = New-Object -TypeName PSObject -Prop $properties
+  $MyScriptInfo = New-Object -TypeName PSObject -Property $properties
   Write-Verbose -Message '[Open-PSEdit] $MyScriptInfo populated'
 #End Region
 
 # Detect older versions of PowerShell and add in new automatic variables for more cross-platform consistency
-if ($Host.Version.Major -le 5) {
-  $Global:IsWindows = $true
-  $Global:PSEdition = 'Windows'
+if ((-not($Global:IsWindows)) -and ($Host.Version.Major -le 5)) {
+  $IsWindows = $true
 }
 
 # dot-source script file containing Add-PATH and related helper functions
 #$RelativePath = Split-Path -Path (Resolve-Path -Path $MyScriptInfo.CommandPath) -Parent
-Write-Verbose -Message "Initializing .\Edit-Path.ps1"
+Write-Verbose -Message 'Initializing .\Edit-Path.ps1'
 . $(Join-Path -Path (Split-Path -Path (Resolve-Path -Path $MyScriptInfo.CommandPath) -Parent) -Childpath 'Edit-Path.ps1')
 
 # Declare path where the functions below should look for git.exe
@@ -78,10 +77,11 @@ Function Get-PSEdit {
 
 Write-Verbose -Message 'Declaring Function Assert-PSEdit'
 Function Assert-PSEdit {
-    [CmdletBinding()]
+    [CmdletBinding(ConfirmImpact='High',SupportsShouldProcess=$true)]
     Param (
         [Parameter(Position=0)]
         [ValidateScript({Test-Path -Path (Resolve-Path -Path $PSItem)})]
+        [String]
         $Path = '$HOME\vscode\app\bin\code.cmd'
     )
 
@@ -130,15 +130,15 @@ Function Assert-PSEdit {
                 Write-Verbose -Message "Adding $(Split-Path -Path $Env:PSEdit -Parent -Resolve) to `$Env:PATH"
                 # Send output from Add-EnvPath to Null, so we don't have to read $Env:Path in the console
                 # No need for pre-processing, as Add-EnvPath function handles attempts to add duplicate path statements
-                Add-EnvPath (Split-Path -Path $Env:PSEdit -Parent -Resolve) | Out-Null
+                $null = Add-EnvPath -Path (Split-Path -Path $Env:PSEdit -Parent -Resolve)
                 # Check and conditionally update File Type Associations, to make it easier to open supported file types in VS Code, from Windows Explorer
-    <#          if (Test-FileTypeAssociation) {
+      <#          if (Test-FileTypeAssociation) {
                     Write-Verbose -Message 'Expected file types are associated with VS code'
                 } else {
                     Write-Verbose -Message 'Associating specified file types with VS code'
                     Add-FileType
                 }
-    #>
+      #>
             }
     } elseif ($PSISE) {
         Write-Verbose -Message "Setting `$Env:PSEdit to $PSISE"
@@ -160,7 +160,7 @@ Function Test-FileTypeAssociation {
     )
     $ErrorActionPreference = 'SilentlyContinue'
     $Answer = (Get-ItemProperty -Path "HKCU:\Software\Classes\$ProgID" -Name '(Default)' -ErrorAction SilentlyContinue).'(Default)'
-    Write-Verbose "ProgID $ProgID is associated as '$Answer'"
+    Write-Verbose -Message "ProgID $ProgID is associated as '$Answer'"
     $ErrorActionPreference = 'Continue'
     if ($Answer -eq $Description) {
         return $true
@@ -171,46 +171,149 @@ Function Test-FileTypeAssociation {
 
 Write-Verbose -Message 'Declaring Function Add-FileTypeAssociation'
 Function Add-FileTypeAssociation {
-    [CmdletBinding()]
-    Param (
-        [Parameter(Position=0)]
-        [string]$ProgID = 'vscode'
-        ,
-        [Parameter(Position=1)]
-        [ValidateScript({Test-Path -Path (Resolve-Path -Path $PSItem)})]
-        [string]$CommandPath = '$HOME\vscode\app\code.exe'
+  [CmdletBinding(ConfirmImpact='High',SupportsShouldProcess=$true)]
+  # see https://msdn.microsoft.com/en-us/library/dd878260(VS.85).aspx
+  Param (
+    [Parameter(Position=0)]
+    [string]$ProgID = 'vscode'
+    ,
+    [Parameter(Position=1)]
+    [ValidateScript({Test-Path -Path (Resolve-Path -Path $PSItem)})]
+    [string]$CommandPath = '$HOME\vscode\app\code.exe'
 
-    )
-    # Programmatically update the Windows "Default Program" for file types / extensions supported by VS Code
+  )
+  # Programmatically update the Windows "Default Program" for file types / extensions supported by VS Code
 
-    <#
-        Method 1: Old school
-        https://technet.microsoft.com/en-us/library/ff687021.aspx
-        https://superuser.com/questions/406985/programatically-associate-file-extensions-with-application-on-windows
-        cmd /c assoc .ps1
+  <#
+      Method 1: Old school
+      https://technet.microsoft.com/en-us/library/ff687021.aspx
+      https://superuser.com/questions/406985/programatically-associate-file-extensions-with-application-on-windows
+      cmd /c assoc .ps1
 
-        Method 2: Registry 'hack'
-        Reminder: "HKEY_CLASSES_ROOT" is an alias to HKLM:\SOFTWARE\Classes
+      Method 2: Registry 'hack'
+      Reminder: "HKEY_CLASSES_ROOT" is an alias to HKLM:\SOFTWARE\Classes
 
-        HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts
-        See also:
-        Programmatic Identifiers
-        https://msdn.microsoft.com/en-us/library/windows/desktop/cc144152(v=vs.85).aspx
-    #>
+      HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts
+      See also:
+      Programmatic Identifiers
+      https://msdn.microsoft.com/en-us/library/windows/desktop/cc144152(v=vs.85).aspx
+  #>
 
     $CodeFileTypes = @('.bash','.bashrc','.bash_login','.bash_logout','.bash_profile','.bat','.cmd','.coffee','.config','.css','.gitattributes','.gitconfig','.gitignore','.go','.htm','.html','.ini','.js','.json','.lua','.kix','.markdown','.md','.mdoc','.mdown','.mdtext','.mdtxt','.mdwn','.mkd','.mkdn','.pl','.pl6','.pm','.pm6','.profile','.properties','.ps1','.psd1','.psgi','.psm1','.py','.sh','.sql','.t','.tex','.ts','.txt','.vb','.vbs','.xaml','.xml','.yaml','.yml','.zsh')
-    #$ProgID = 'vscode'
 
-    # Create a new "Edit" verb key under the current user's Classes hive for the ProgID association
-    # For PS1 / Microsoft.PowerShellScript.1, Edit is typically ISE, and 'Open' invokes Notepad
-    New-Item -Path "HKCU:\Software\Classes\$ProgID" -Force
-    Write-Verbose "Set-ItemProperty -Path ""HKCU:\Software\Classes\$ProgID"" -Name '(Default)' -Value 'code file'"
-    Set-ItemProperty -Path "HKCU:\Software\Classes\$ProgID" -Name '(Default)' -Value 'code file'
-    Write-Verbose "New-Item -Path HKCU:\SOFTWARE\Classes\$ProgID\shell\Edit with VS Code\command :: ""$CommandPath"" ""%1"""
-    New-Item -Path "HKCU:\SOFTWARE\Classes\$ProgID\shell\Edit with VS Code\command" -Force -ErrorAction SilentlyContinue | out-null
-    New-ItemProperty -Path "HKCU:\SOFTWARE\Classes\$ProgID\shell\Edit with VS Code\command" -Name '(Default)' -PropertyType String -Value """$CommandPath"" ""%1"""
+$RegCUSWtypes = DATA {
+    ConvertFrom-StringData -stringdata @"
+.bash = Bash Script
+.bashrc = Bash Script
+.bash_login = Bash Script
+.bash_logout = Bash Script
+.bash_profile = Bash Script
+.bat = Batch Script
+.cmd = Command script
+.config = Configuration File
+.css = Cascading Style Sheet
+.gitattributes = Git
+.gitconfig = Git
+.gitignore = Git
+.go = Go Program
+.htm = Web File
+.html = Web File
+.ini = Configuration File
+.js = JavaScript
+.json = JavaScript Configuration File
+.lua = LUA Script
+.kix = KIX Script
+.markdown = Markdown Document
+.md = Markdown Document
+.mdoc = Markdown Document
+.mdown = Markdown Document
+.mdtext = Markdown Document
+.mdtxt = Markdown Document
+.mdwn = Markdown Document
+.mkd = Markdown Document
+.mkdn = Markdown Document
+.pl = Perl Script
+.pl6 = Perl Script
+.pm = Perl Module
+.pm6 = Perl Module
+.profile = Bash Script
+.properties = Configuration File
+.ps1 = PowerShell Script
+.psd1 = PowerShell Data Script
+.psm1 = PowerShell Module Script
+.py = Python Script
+.sh = Shell Script
+.sql = SQL Script
+.txt = Text Document
+.vb = VB Script
+.vbs = VB Script
+.xaml = XAML Document 
+.xml = XML Document
+.yaml = YAML Configuration File
+.yml = YAML Configuration File
 
-    # Build an associative array / hash table of current FileExt / File Types and their ProgID Association(s) File Type Association (a.k.a. FTA)
+HKEY_CLASSES_ROOT
+   Vendor.App.1
+      (Default) = My Friendly Name
+      AllowSilentDefaultTakeOver
+      AppUserModelID = Vendor.Application
+      EditFlags = 0x00010004
+      FriendlyTypeName = @%SystemRoot%\shell32.dll,-154
+      InfoTip = @%SystemRoot%\shell32.dll,-54
+      CurVer
+         (Default) = Vendor.App.1
+      DefaultIcon
+         (Default) = %SystemRoot%\shell32.dll,-1
+
+         FILETYPEATTRIBUTEFLAGS
+         https://msdn.microsoft.com/en-us/library/windows/desktop/bb762506(v=vs.85).aspx
+
+HKCU:\SOFTWARE\Classes\Microsoft.PowerShellSessionConfiguration.1
+
+[default] Batch Script : batfile
+[default] Cascading Style Sheet : CSSfile
+[default] Command script : cmdfile
+[default] Configuration File : inifile
+[default] Microsoft.PowerShellData.1
+[default] Microsoft.PowerShellModule.1
+[default] Microsoft.PowerShellScript.1
+[default] Microsoft.PowerShellSessionConfiguration.1
+[default] Microsoft.PowerShellXMLData.1
+[default] SQL Script : SQL.document
+[default] Text Document : txtfile
+[default] VBScript : VBSFile
+[default] Web File : (.htm) HTTP
+[default] Web File : (.html) htmlfile
+[default] XAML Document  : Windows.XamlDocument
+[default] XML Document : xmlfile
+
+Bash Script : bashfile
+Configuration File : (.config) inifile
+Configuration File : (.properties) inifile
+Git : gitfile
+Go Program : gofile
+JavaScript (.json): JSFile
+KIX Script : kixfile
+LUA Script : luafile
+Markdown Document : markdownfile
+Perl Module : Perl.Module
+Perl Script : Perl.Script
+Python Script : pyfile
+Shell Script : shfile
+YAML Configuration File : yamlfile
+"@
+}  
+
+  # Create a new "Edit" verb key under the current user's Classes hive for the ProgID association
+  # For PS1 / Microsoft.PowerShellScript.1, Edit is typically ISE, and 'Open' invokes Notepad
+  New-Item -Path "HKCU:\Software\Classes\$ProgID" -Force
+  Write-Verbose -Message "Set-ItemProperty -Path ""HKCU:\Software\Classes\$ProgID"" -Name '(Default)' -Value 'code file'"
+  Set-ItemProperty -Path "HKCU:\Software\Classes\$ProgID" -Name '(Default)' -Value 'code file'
+  Write-Verbose -Message "New-Item -Path HKCU:\SOFTWARE\Classes\$ProgID\shell\Edit with VS Code\command :: ""$CommandPath"" ""%1"""
+  $null = New-Item -Path "HKCU:\SOFTWARE\Classes\$ProgID\shell\Edit with VS Code\command" -Force -ErrorAction SilentlyContinue
+  New-ItemProperty -Path "HKCU:\SOFTWARE\Classes\$ProgID\shell\Edit with VS Code\command" -Name '(Default)' -PropertyType String -Value """$CommandPath"" ""%1"""
+
+  # Build an associative array / hash table of current FileExt / File Types and their ProgID Association(s) File Type Association (a.k.a. FTA)
     $CodeFileTypes | ForEach-Object -Process {
         Write-Verbose "Updating FileType Association -- HKCU:\SOFTWARE\Classes\$PSItem :: $ProgID"
         New-Item -Path "HKCU:\SOFTWARE\Classes\$PSItem" -Force -ErrorAction SilentlyContinue | out-null
@@ -219,47 +322,48 @@ Function Add-FileTypeAssociation {
         #$FTA.Add($PSItem,$ProgID)
     }
 
-    Write-Verbose ' > (line break)'
-    Write-Verbose ' > (line break)'
-    Write-Verbose ' > (line break)'
-    Write-Warning -Message " !`t!`t!`n`t> > > `n`t> > > Restarting Windows Explorer to refresh your file type associations.`n`t> > > "
-    '10 ...'
-    Start-Sleep -Seconds 1
-    '9 ...'
-    Start-Sleep -Seconds 1
-    '8 ...'
-    Start-Sleep -Seconds 1
-    '7 ...'
-    Start-Sleep -Seconds 1
-    '6 ...'
-    Start-Sleep -Seconds 1
-    '5 ...'
-    Start-Sleep -Seconds 1
-    '4 ...'
-    Start-Sleep -Seconds 1
-    '3 ...'
-    Start-Sleep -Seconds 1
-    '2 ...'
-    Start-Sleep -Seconds 1
-    '1 ...'
-    Start-Sleep -Seconds 1
-    Get-Process -Name explorer* | Stop-Process
-    #Start-Sleep -Seconds 1
-    "Opening Explorer to $HOME"
-    Start-Sleep -Seconds 1
-    & explorer.exe $HOME
+  Write-Verbose -Message ' > (line break)'
+  Write-Verbose -Message ' > (line break)'
+  Write-Verbose -Message ' > (line break)'
+  Write-Warning -Message " !`t!`t!`n`t> > > `n`t> > > Restarting Windows Explorer to refresh your file type associations.`n`t> > > "
+  '10 ...'
+  Start-Sleep -Seconds 1
+  '9 ...'
+  Start-Sleep -Seconds 1
+  '8 ...'
+  Start-Sleep -Seconds 1
+  '7 ...'
+  Start-Sleep -Seconds 1
+  '6 ...'
+  Start-Sleep -Seconds 1
+  '5 ...'
+  Start-Sleep -Seconds 1
+  '4 ...'
+  Start-Sleep -Seconds 1
+  '3 ...'
+  Start-Sleep -Seconds 1
+  '2 ...'
+  Start-Sleep -Seconds 1
+  '1 ...'
+  Start-Sleep -Seconds 1
+  Get-Process -Name explorer* | Stop-Process
+  #Start-Sleep -Seconds 1
+  "Opening Explorer to $HOME"
+  Start-Sleep -Seconds 1
+  & "$env:windir\explorer.exe" $HOME
 }
 
 Write-Verbose -Message 'Declaring Function Initialize-Git'
 Function Initialize-Git {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
     param (
-	    [parameter(Mandatory, 
-	        ValueFromPipeline,
-	        Position = 0)]
+      [parameter(Mandatory,
+          HelpMessage='Specify the path to git.exe', 
+          ValueFromPipeline,
+          Position = 0)]
         [Alias('Folder')]
-	    [String]$Path
-	)
+      [String]$Path
+  )
 
     if (($null -ne $Path) -and (Test-Path -Path $Path -PathType Container)) {
         $gitdir = Resolve-Path -Path $Path
@@ -271,11 +375,11 @@ Function Initialize-Git {
         # Check and update $Env:PATH to include path to code; some code extensions look for code in the PATH
         Write-Verbose -Message "Adding (git) $gitdir to `$Env:PATH"
         # Send output from Add-EnvPath to Null, so we don't have to read $Env:Path in the console
-        Add-EnvPath -Path $gitdir # | Out-Null
+        (Add-EnvPath -Path $gitdir) -split ';'
         $Env:GIT_DIR = $gitdir
 
         Write-Warning -Message "Add-EnvPath -Path $gitdir may not have succeeded."
-        Write-Host -Message "`$Env:PATH += ;$gitdir"
+        Write-Verbose -Message "`$Env:PATH += ;$gitdir"
         $Env:PATH += ";$gitdir"
 
         if ($Env:PATH -split ';' -contains $gitdir) {
@@ -285,7 +389,7 @@ Function Initialize-Git {
             return $false
         }
     } else {
-        Write-Host -Message '-Path to GIT_DIR either not specified or Path not valid'
+        Write-Verbose -Message '-Path to GIT_DIR either not specified or Path not valid'
     }
 }
 New-Alias -Name Init-Git -Value Initialize-Git -Scope Global -Force
@@ -327,7 +431,7 @@ function Open-PSEdit {
         --install-extension guosong.vscode-util --install-extension ms-vscode.PowerShell --install-extension Shan.code-settings-sync --install-extension wmaurer.change-case --install-extension DavidAnson.vscode-markdownlint
         --install-extension LaurentTreguier.vscode-simple-icons --install-extension seanmcbreen.Spell --install-extension mohsen1.prettify-json --install-extension ms-vscode.Theme-MarkdownKit 
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
     param (
         [Parameter(Position=0)]
         [array]
@@ -340,7 +444,7 @@ function Open-PSEdit {
         Assert-PSEdit
     }
 
-    $ArgsArray = New-Object System.Collections.ArrayList
+    $ArgsArray = New-Object -TypeName System.Collections.ArrayList
 
     if ($Env:PSEdit -Like "*\code*") {
         Write-Verbose -Message '$Env:PSEdit -Like "*code*"; adding VS Code arguments'
@@ -357,7 +461,7 @@ function Open-PSEdit {
         } #>
     }
 
-    if ($Env:PSEdit -Like "*Microsoft VS Code*") {
+    if ($Env:PSEdit -Like '*Microsoft VS Code*') {
         # If Code appears to be installed, as signalled by \Microsoft VS Code\ in it's path, then let it use default user-data-dir and extensions-dir
         $ArgsArray.Remove("--user-data-dir $(Join-Path -Path $HOME -Childpath 'vscode')")
         $ArgsArray.Remove("--extensions-dir $(Join-Path -Path $HOME -Childpath 'vscode\extensions')")
@@ -372,7 +476,7 @@ function Open-PSEdit {
     #         [-p | --paginate | --no-pager] [--no-replace-objects] [--bare]
     #         [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]
     #         <command> [<args>]
-    if ($Env:PATH -notlike "*GitPortable\cmd*") {
+    if ($Env:PATH -notlike '*GitPortable\cmd*') {
 
         if (Test-Path -Path $GitPath) {
             Write-Verbose -Message "Initialize-Git -Path '$GitPath'"
@@ -384,12 +488,12 @@ function Open-PSEdit {
             Write-Verbose -Message 'Setting $Env:GIT_CONFIG_NOSYSTEM = 1'
             $Env:GIT_CONFIG_NOSYSTEM = '1'
             Write-Verbose -Message '& git config credential.helper wincred'
-            git config credential.helper wincred
+            & "$env:GIT_DIR\git.exe" config credential.helper wincred
 
             Write-Verbose -Message '& git --version'
-            git --version
+            & "$env:GIT_DIR\git.exe" --version
             if (!$?) {
-                Write-Warning -Message "git --version returned an error, likely because git was not found in PATH. Suggest manually modifying PATH to support git before re-opening VS Code"
+                Write-Warning -Message 'git --version returned an error, likely because git was not found in PATH. Suggest manually modifying PATH to support git before re-opening VS Code'
             } else {
                 Write-Verbose -Message "To review your git configuration(s), run 'git config --list --show-origin --path'"
             }

@@ -15,49 +15,53 @@ Set-StrictMode -Version latest
 
 #Region MyScriptInfo
     Write-Verbose -Message '[NetSiteName] Populating $MyScriptInfo'
-    $script:MyCommandName = $MyInvocation.MyCommand.Name
-    $script:MyCommandPath = $MyInvocation.MyCommand.Path
-    $script:MyCommandType = $MyInvocation.MyCommand.CommandType
-    $script:MyCommandModule = $MyInvocation.MyCommand.Module
-    $script:MyModuleName = $MyInvocation.MyCommand.ModuleName
-    $script:MyCommandParameters = $MyInvocation.MyCommand.Parameters
-    $script:MyParameterSets = $MyInvocation.MyCommand.ParameterSets
-    $script:MyRemotingCapability = $MyInvocation.MyCommand.RemotingCapability
-    $script:MyVisibility = $MyInvocation.MyCommand.Visibility
+    $Private:MyCommandName        = $MyInvocation.MyCommand.Name
+    $Private:MyCommandPath        = $MyInvocation.MyCommand.Path
+    $Private:MyCommandType        = $MyInvocation.MyCommand.CommandType
+    $Private:MyCommandModule      = $MyInvocation.MyCommand.Module
+    $Private:MyModuleName         = $MyInvocation.MyCommand.ModuleName
+    $Private:MyCommandParameters  = $MyInvocation.MyCommand.Parameters
+    $Private:MyParameterSets      = $MyInvocation.MyCommand.ParameterSets
+    $Private:MyRemotingCapability = $MyInvocation.MyCommand.RemotingCapability
+    $Private:MyVisibility         = $MyInvocation.MyCommand.Visibility
 
-    if (($null -eq $script:MyCommandName) -or ($null -eq $script:MyCommandPath)) {
+    if (($null -eq $Private:MyCommandName) -or ($null -eq $Private:MyCommandPath)) {
         # We didn't get a successful command / script name or path from $MyInvocation, so check with CallStack
-        Write-Verbose -Message "Getting PSCallStack [`$CallStack = Get-PSCallStack]"
-        $CallStack = Get-PSCallStack | Select-Object -First 1
+        Write-Verbose -Message 'Getting PSCallStack [$CallStack = Get-PSCallStack]'
+        $Private:CallStack      = Get-PSCallStack | Select-Object -First 1
         # $CallStack | Select Position, ScriptName, Command | format-list # FunctionName, ScriptLineNumber, Arguments, Location
-        $script:myScriptName = $CallStack.ScriptName
-        $script:myCommand = $CallStack.Command
-        Write-Verbose -Message "`$ScriptName: $script:myScriptName"
-        Write-Verbose -Message "`$Command: $script:myCommand"
+        $Private:myScriptName   = $Private:CallStack.ScriptName
+        $Private:myCommand      = $Private:CallStack.Command
+        Write-Verbose -Message "`$ScriptName: $Private:myScriptName"
+        Write-Verbose -Message "`$Command: $Private:myCommand"
         Write-Verbose -Message 'Assigning previously null MyCommand variables with CallStack values'
-        $script:MyCommandPath = $script:myScriptName
-        $script:MyCommandName = $script:myCommand
+        $Private:MyCommandPath  = $Private:myScriptName
+        $Private:MyCommandName  = $Private:myCommand
     }
 
     #'Optimize New-Object invocation, based on Don Jones' recommendation: https://technet.microsoft.com/en-us/magazine/hh750381.aspx
     $Private:properties = [ordered]@{
-        'CommandName'        = $script:MyCommandName
-        'CommandPath'        = $script:MyCommandPath
-        'CommandType'        = $script:MyCommandType
-        'CommandModule'      = $script:MyCommandModule
-        'ModuleName'         = $script:MyModuleName
-        'CommandParameters'  = $script:MyCommandParameters.Keys
-        'ParameterSets'      = $script:MyParameterSets
-        'RemotingCapability' = $script:MyRemotingCapability
-        'Visibility'         = $script:MyVisibility
+        'CommandName'        = $Private:MyCommandName
+        'CommandPath'        = $Private:MyCommandPath
+        'CommandType'        = $Private:MyCommandType
+        'CommandModule'      = $Private:MyCommandModule
+        'ModuleName'         = $Private:MyModuleName
+        'CommandParameters'  = $Private:MyCommandParameters.Keys
+        'ParameterSets'      = $Private:MyParameterSets
+        'RemotingCapability' = $Private:MyRemotingCapability
+        'Visibility'         = $Private:MyVisibility
     }
-    $MyScriptInfo = New-Object -TypeName PSObject -Prop $properties
+    $MyScriptInfo = New-Object -TypeName PSObject -Property $Private:properties
     Write-Verbose -Message '[NetSiteName] $MyScriptInfo populated'
+
+    if ('Verbose' -in $PSBoundParameters.Keys) {
+        Write-Verbose -Message 'Output Level is [Verbose]. $MyScriptInfo is:'
+        $MyScriptInfo
+    }
 #End Region
 
 Write-Verbose -Message 'Declaring Function Get-NetSite'
-function Get-NetSite
-{
+function Get-NetSite {
     <#
         .SYNOPSIS
             Returns a custom object with properties related to location on a corporate network, and basic DHCP info, collected from Get-IPAddress function.
@@ -93,53 +97,46 @@ function Get-NetSite
     Get-IPAddress | ForEach-Object -Process {
         # Is there a better way to make this a lookup, e.g. from an Array ... that could be referenced in JSON or CSV?
         switch -Regex ($PSItem.IPAddress) {
-            ^10\.10\.\d+
-            {
+            ^10\.10\.\d+ {
                 $Private:SiteName = 'Helena'
                 break
             }
-            ^10\.20\.\d+
-            {
+            ^10\.20\.\d+ {
                 $Private:SiteName = 'Missoula - CoLo'
                 break
             }
-            ^10\.100\.92\.\d+
-            {
+            ^10\.100\.92\.\d+ {
                 $Private:SiteName = 'Missoula - Great Northern'
                 break
             }
-            ^10\.100\.91\.\d+
-            {
+            ^10\.100\.91\.\d+ {
                 $Private:SiteName = 'Missoula - Southgate'
                 break
             }
-            ^10\.100\.9\d\.\d+
-            {
+            ^10\.100\.9\d\.\d+ {
                 $Private:SiteName = 'Missoula - Other'
                 break
             }
-            ^10\.100\.\d+
-            {
+            ^10\.100\.\d+ {
                 $Private:SiteName = 'Corporate'
                 break
             }
-            ^10\.100\.\d+
-            {
+            ^10\.100\.\d+ {
                 $Private:SiteName = 'NCB - Chelan'
                 break
-            }            ^10\.116\.1\.\d+
-            {
+            }
+            ^10\.116\.1\.\d+ {
                 $Private:SiteName = 'Private NAT'
                 break
             }
-            Default
-            {
+            Default {
                 $Private:SiteName = 'Unrecognized'
-                break
+                #break
             }
         } # end switch
 
-        $Private:properties = [ordered]@{
+        # Define default return-object properties // Optimize New-Object invocation, based on Don Jones' recommendation: https://technet.microsoft.com/en-us/magazine/hh750381.aspx
+        $Private:properties      = [ordered]@{
             'AdapterHost'        = 'Undefined'
             'AdapterDescription' = 'Undefined'
             'SiteName'           = 'Undefined'
@@ -148,12 +145,9 @@ function Get-NetSite
             'DNSServers'         = 'Undefined'
         }
 
-        if ($Private:SiteName -eq 'Unrecognized')
-        {
+        if ($Private:SiteName -eq 'Unrecognized') {
             Write-Log -Message "Connected to unrecognized or non-workplace network : $($PSItem.IPAddress)" -Function 'NetSiteName' -Verbose
-        }
-        else
-        {
+        } else {
             Write-Log -Message "Connected to $env:USERDOMAIN - $SiteName" -Function 'NetSiteName'
         } # end if $SiteName
 
@@ -167,8 +161,8 @@ function Get-NetSite
             'DNSServers'         = $PSItem.DNSServers
         } # end properties
 
-        $Private:RetObject = New-Object -TypeName PSObject -Property $properties
+        $Private:RetObject = New-Object -TypeName PSObject -Property $Private:properties
 
-        return $RetObject
+        return $Private:RetObject
     } # end foreach
 } # end function Get-NetSite

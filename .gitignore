@@ -1,6 +1,6 @@
 # Windows image file caches
 Thumbs.db
-ehthumbs.db
+ethumbs.db
 
 # Folder config file
 Desktop.ini
@@ -46,3 +46,4 @@ Network Trash Folder
 Temporary Items
 .apdisk
 *.orig
+*.bak

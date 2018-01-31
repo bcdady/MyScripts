@@ -3,19 +3,64 @@
 # PowerShell $Profile supplement script
 # Bryan's GBCI / XenApp specific functions, aliases, and other conveniences, which don't belong directly in the profile script
 
-# ~/.config/powershell/Microsoft.PowerShell_profile.ps1    
-
 [cmdletbinding()]
 Param()
 
-$StartXenApp = Join-Path -Path $(Split-Path -Path $MyInvocation.MyCommand.Path -Parent) -ChildPath 'Start-XenApp.ps1' -Resolve -ErrorAction Stop
-Write-Verbose -Message "Loading prerequisite functions from .\Start-XenApp.ps1"
-. $StartXenApp
+#Region MyScriptInfo
+    Write-Verbose -Message '[GBCI-XenApp] Populating $MyScriptInfo'
+    $Private:MyCommandName        = $MyInvocation.MyCommand.Name
+    $Private:MyCommandPath        = $MyInvocation.MyCommand.Path
+    $Private:MyCommandType        = $MyInvocation.MyCommand.CommandType
+    $Private:MyCommandModule      = $MyInvocation.MyCommand.Module
+    $Private:MyModuleName         = $MyInvocation.MyCommand.ModuleName
+    $Private:MyCommandParameters  = $MyInvocation.MyCommand.Parameters
+    $Private:MyParameterSets      = $MyInvocation.MyCommand.ParameterSets
+    $Private:MyRemotingCapability = $MyInvocation.MyCommand.RemotingCapability
+    $Private:MyVisibility         = $MyInvocation.MyCommand.Visibility
+
+    if (($null -eq $Private:MyCommandName) -or ($null -eq $Private:MyCommandPath)) {
+        # We didn't get a successful command / script name or path from $MyInvocation, so check with CallStack
+        Write-Verbose -Message 'Getting PSCallStack [$CallStack = Get-PSCallStack]'
+        $Private:CallStack      = Get-PSCallStack | Select-Object -First 1
+        # $CallStack | Select Position, ScriptName, Command | format-list # FunctionName, ScriptLineNumber, Arguments, Location
+        $Private:myScriptName   = $Private:CallStack.ScriptName
+        $Private:myCommand      = $Private:CallStack.Command
+        Write-Verbose -Message "`$ScriptName: $Private:myScriptName"
+        Write-Verbose -Message "`$Command: $Private:myCommand"
+        Write-Verbose -Message 'Assigning previously null MyCommand variables with CallStack values'
+        $Private:MyCommandPath  = $Private:myScriptName
+        $Private:MyCommandName  = $Private:myCommand
+    }
+
+    #'Optimize New-Object invocation, based on Don Jones' recommendation: https://technet.microsoft.com/en-us/magazine/hh750381.aspx
+    $Private:properties = [ordered]@{
+        'CommandName'        = $Private:MyCommandName
+        'CommandPath'        = $Private:MyCommandPath
+        'CommandType'        = $Private:MyCommandType
+        'CommandModule'      = $Private:MyCommandModule
+        'ModuleName'         = $Private:MyModuleName
+        'CommandParameters'  = $Private:MyCommandParameters.Keys
+        'ParameterSets'      = $Private:MyParameterSets
+        'RemotingCapability' = $Private:MyRemotingCapability
+        'Visibility'         = $Private:MyVisibility
+    }
+    $MyScriptInfo = New-Object -TypeName PSObject -Property $Private:properties
+    Write-Verbose -Message '[GBCI-XenApp] $MyScriptInfo populated'
+
+    if ('Verbose' -in $PSBoundParameters.Keys) {
+        Write-Verbose -Message 'Output Level is [Verbose]. $MyScriptInfo is:'
+        $MyScriptInfo
+    }
+#End Region
+
+# $StartXenApp = Join-Path -Path $(Split-Path -Path $MyInvocation.MyCommand.Path -Parent) -ChildPath 'Start-XenApp.ps1' -Resolve -ErrorAction Stop
+Write-Verbose -Message 'Loading prerequisite functions from .\Start-XenApp.ps1'
+. (Join-Path -Path (Split-Path -Path $MyScriptInfo.CommandPath -Parent) -ChildPath Start-XenApp.ps1) -ErrorAction Stop
 
 Write-Verbose -Message 'Loading functions from GBCI-XenApp.ps1'
 
 # Define MyProcesses variable so it can be referenced within and across functions
-Set-Variable -Name MyProcesses -Option AllScope
+Set-Variable -Name MyProcesses #-Option AllScope
 
 Write-Verbose -Message 'Declaring function Logon-Work'
 function Logon-Work {
@@ -87,8 +132,8 @@ function xa_assyst {
 function xa_cmd {
   # Start Command Line
   if ($Global:onServer) {
-    Write-Output -InputObject '& cmd.exe'
-    & cmd.exe
+    Write-Output -InputObject "& $env:ComSpec"
+    & "$env:ComSpec"
   } else {
     # locally, via Receiver ...
     Write-Output -InputObject 'Start-XenApp -QLaunch cmd'
@@ -111,8 +156,8 @@ Set-Alias -Name xa_xl -Value xa_excel
 
 function xa_hdrive {
   if ($Global:onServer) {
-    Write-Output -InputObject 'explorer.exe H:\'
-    & explorer.exe 'H:\'
+    Write-Output -InputObject "explorer.exe $env:HOMEDRIVE\"
+    & "$env:windir\explorer.exe" "$env:HOMEDRIVE\"
   } else {
     # locally, via Receiver ...
     Write-Output -InputObject 'Start-XenApp -QLaunch "H Drive"'
@@ -215,7 +260,7 @@ Set-Alias -Name xa_ppt -Value xa_powerpoint
 function xa_sdrive {
   if ($Global:onServer) {
     Write-Output -InputObject 'explorer.exe S:\'
-    & explorer.exe 'S:\'
+    & "$env:windir\explorer.exe" 'S:\'
   } else {
     Write-Output -InputObject 'Start-XenApp -QLaunch "S Drive"'
     Start-XenApp -QLaunch 'S Drive'
@@ -285,8 +330,8 @@ function xa_adobe {
     Write-Output -InputObject 'Adobe Reader XI.lnk'
     start-process -FilePath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Adobe Reader XI.lnk"
   } else {
-    Write-Output -InputObject 'H:\Desktop\Palo Alto Enterprise Security for Financial Services.PDF'
-    & 'H:\Desktop\Palo Alto Enterprise Security for Financial Services.PDF'
+    Write-Output -InputObject "$env:DESKTOP\Palo Alto Enterprise Security for Financial Services.PDF"
+    & "$env:DESKTOP\Palo Alto Enterprise Security for Financial Services.PDF"
   }
 }
 Set-Alias -Name xa_reader -Value xa_adobe
@@ -311,93 +356,205 @@ function xa_restart {
 
 Write-Verbose -Message 'Declaring function Start-MyXenApps'
 function Start-MyXenApps {
-  [cmdletbinding()]
-  Param()
+    [cmdletbinding()]
+    Param()
 
-  # RFE: run this in the background?
-#  Write-Output -InputObject 'Starting Skype for Business'
-#  xa_skype
-#  Start-Sleep -Seconds 6
-  Write-Output -InputObject 'Opening Desktop folder'
-  explorer.exe 'H:\Desktop'
-  Write-Output -InputObject 'Starting OneNote'
-  xa_onenote
-  Start-Sleep -Seconds 3
-  Write-Output -InputObject 'Opening Assyst, ITSC, and Workfront (in default browser)'
-  xa_itsc
-  Start-Sleep -Seconds 1
-  xa_assyst
-  Start-Sleep -Seconds 1
-  Open-MyWebPages
-  Start-Sleep -Seconds 30
-  Write-Output -InputObject "Setting GC92IT250_(Grayscale) as default printer"
-  Set-Printer -printerShareName 'GC92IT250_(Grayscale)'
-  Start-Sleep -Milliseconds 250
-  get-printer -Default
-  Start-Sleep -Seconds 1
-  sndvol.exe
-  Start-Sleep -Seconds 5
-  Write-Output -InputObject 'Opening Firefox'
-  xa_firefox
-  Start-Sleep -Seconds 5
-  Write-Output -InputObject 'Starting Outlook'
-  xa_outlook
-#  & $HOME\Downloads\ieanywhere_x64.exe # pocket.exe
+    # RFE: run this in the background?
+    #  Write-Output -InputObject 'Starting Skype for Business'
+    #  xa_skype
+    #  Start-Sleep -Seconds 6
+    Write-Output -InputObject 'Opening Desktop folder'
+    & "$env:windir\explorer.exe" "$env:DESKTOP"
+    Write-Output -InputObject 'Starting OneNote'
+    xa_onenote
+    Start-Sleep -Seconds 3
+    Write-Output -InputObject 'Opening Firefox'
+    xa_firefox
+    #  Start-Sleep -Seconds 5
+    #  Write-Output -InputObject 'Opening Assyst, ITSC, and Workfront (in default browser)'
+    #  xa_itsc
+    #  Start-Sleep -Seconds 2
+    #  xa_assyst
+    #  Start-Sleep -Seconds 1
+    #  Open-MyWebPages
+    #  Start-Sleep -Seconds 30
+    #  Write-Output -InputObject "Setting GC92IT250_(Grayscale) as default printer"
+    #  Set-Printer -printerShareName 'GC92IT250_(Grayscale)'
+    Start-Sleep -Milliseconds 250
+    get-printer -Default
+    Start-Sleep -Seconds 1
+    & "$env:windir\system32\sndvol.exe"
+    Start-Sleep -Seconds 5
+    Write-Output -InputObject 'Starting Outlook'
+    xa_outlook
 }
+
+$MyKnownApps = @(
+    'AcroRd32.exe', 'NuancePDF.exe',
+    'Code.exe', 'CodeHelper.exe', 'powershell_ise.exe',
+    'lync.exe', 'CommunicatorForLync2013.exe', 'firefox.exe',
+    'EXCEL.EXE', 'ONENOTE.EXE', 'ONENOTEM.EXE', 'OUTLOOK.EXE', 'VISIO.exe', 'WINWORD.exe',
+    'cmd.exe', 'explorer.exe', 'iexplore.exe', 'regedit.exe',
+    'SndVol.exe', 'TaskMgr.exe', 
+    'g2mcomm.exe', 'g2mstart.exe', 'g2mlauncher.exe'
+)
 
 Write-Verbose -Message 'Declaring function Stop-MyXenApps'
 function Stop-MyXenApps {
-  [cmdletbinding()]
-  Param()
+    [CmdletBinding()]
+    Param()
 
-  if ((Get-Variable -Name MyProcesses -ErrorAction Ignore) -and ($null -ne $MyProcesses)) {
-    Write-Verbose -Message 'Found variable $MyProcesses'
-  } else {
-    Write-Verbose -Message 'Getting my processes'
-    $MyProcesses = Get-ProcessByUser
-  }
+    if ($onServer) {
+        Write-Output -InputObject ' # Citrix Environment Shutdown #'
+        Write-Verbose -Message " # $($MyScriptInfo.CommandPath) #"
+        
+        Write-Warning -Message ' # Open Citrix Connection Center #'
+        Start-Sleep -Seconds 5
 
-  $MyKnownApps = @('Code.exe','explorer.exe','iexplore.exe','firefox.exe','g2mcomm.exe','g2mlauncher.exe','g2mstart.exe','outlook.exe','onenote.exe','onenotem.exe','POWERPNT.EXE','WINWORD.EXE','excel.exe','visio.exe','powershell.exe')
-  
-  if ('outlook.exe' -in $MyProcesses.Name) {
-    'Exit-Outlook'
-    Exit-Outlook
-  }
+        Write-Output -InputObject 'Shutting down XenApp Session'
 
-  $MyProcesses | Format-Table
+        if (Get-Variable -Name MyProcesses -ErrorAction Ignore) {
+            Write-Verbose -Message 'Found variable $MyProcesses'
+        } else {
+            Write-Verbose -Message 'Getting my processes'
+            $MyProcesses = Get-ProcessByUser
+            $MyProcessesDateTime = $now
+        }
 
-  '$MyKnownApps'
-  $MyKnownApps
-  ' '
+        foreach ($app in ($MyProcesses | Sort-Object -Property ProcessID)) {
+            if ($app.Name -in $MyKnownApps) {
+                " # Stop App $($app.Name)"
+                switch ($app.Name) {
+                    'outlook.exe' {
+                        Write-Verbose -Message 'Quitting Outlook'
+                        (New-Object -ComObject Outlook.Application).Quit()
+                    }
+                    'Code.exe' {
+                        foreach ($ProcessID in $($app.ProcessID -split ',')) {
+                            " ! Stop process $ProcessID"
+                            Stop-Process -Id $ProcessID -PassThru -Confirm -ErrorAction Ignore
+                        }
+                    }
+                    'powershell_ise.exe' {
+                        foreach ($ProcessID in $($app.ProcessID -split ',')) {
+                            " ! Stop process $ProcessID"
+                            Stop-Process -Id $ProcessID -PassThru -Confirm -ErrorAction Ignore
+                        }
+                    }
+                    'EXCEL.EXE' {
+                        foreach ($ProcessID in $($app.ProcessID -split ',')) {
+                            " ! Stop process $ProcessID"
+                            Stop-Process -Id $ProcessID -PassThru -Confirm -ErrorAction Ignore
+                        }
+                    }
+                    'VISIO.exe' {
+                        foreach ($ProcessID in $($app.ProcessID -split ',')) {
+                            " ! Stop process $ProcessID"
+                            Stop-Process -Id $ProcessID -PassThru -Confirm -ErrorAction Ignore
+                        }
+                    }
+                    'WINWORD.exe' {
+                        foreach ($ProcessID in $($app.ProcessID -split ',')) {
+                            " ! Stop process $ProcessID"
+                            Stop-Process -Id $ProcessID -PassThru -Confirm -ErrorAction Ignore
+                        }
+                    }
+                    'NuancePDF.exe' {
+                        foreach ($ProcessID in $($app.ProcessID -split ',')) {
+                            " ! Stop process $ProcessID"
+                            Stop-Process -Id $ProcessID -PassThru -Confirm -ErrorAction Ignore
+                        }
+                    }
+                    'firefox.exe' {
+                        foreach ($ProcessID in $($app.ProcessID -split ',')) {
+                            " ! Stop process $ProcessID"
+                            Stop-Process -Id $ProcessID -PassThru -Confirm -ErrorAction Ignore
+                        }
+                    }
+                    'g2mstart.exe' {
+                        Write-Verbose -Message 'Quitting GoToMeeting'
+                        taskkill.exe /F /IM "g2mstart.exe" 
+                    }
+                    'g2mlauncher.exe' {
+                        Write-Verbose -Message 'Quitting GoToMeeting'
+                        taskkill.exe /F /IM "g2mlauncher.exe" 
+                    }
+                    'g2mcomm.exe' {
+                        Write-Verbose -Message 'Quitting GoToMeeting'
+                        taskkill.exe /F /IM "g2mcomm.exe" 
+                    }
+                    Default {
+                        foreach ($ProcessID in $($app.ProcessID -split ',')) {
+                            " ! Stop process $ProcessID"
+                            Stop-Process -Id $ProcessID -PassThru
+                        }
+                    }
+                }
+                Start-Sleep -Seconds 1
+            } else {
+                " > Skipping App $($app.Name)"
+            }
+        }
 
-  $MyProcesses | ForEach {
-    Write-Verbose -Message "Looking for $($PSItem.Name) in `$MyKnownApps"
-    if ($PSItem.Name -in $MyKnownApps) {
-      Write-Verbose -Message "Quitting $($PSItem.Name)"
-      ForEach-Object -InputObject $(($PSItem.ProcessId) -split',') -Process {
-        Write-Verbose -Message "Stop-Process -Id $PSItem"
-        Stop-Process -Id $PSItem -Confirm  -ErrorAction Ignore
-      }
+        $MyProcessesDoubleCheck = Get-ProcessByUser
+        if ($MyProcessesDoubleCheck -eq $MyProcesses) {
+            # it seems something didn't go right, if we still have all the same apps / processes running
+            Write-Warning -Message 'No change detected in running apps. You likely need to try again.'
+        } else {
+            Write-Output -InputObject 'Exit'
+            Start-Sleep -Seconds 5
+            Exit # PowerShell
+        }
+
+    } else {
+        # Reset / refresh PowerShell environment variables to local system
+        # Set Verbose host output Preference
+        $VerbosePreference = 'Continue'
+        Remove-Variable -Name myPS*
+        Dismount-Path -Confirm
+
+        if (Test-Path -Path $HOME) {
+            Write-Verbose -Message ('{0} is still available' -f $HOME)
+        } else {
+            if (Test-Path -Path $env:USERPROFILE) {
+                Write-Verbose -Message ('Updating {0} to {1}' -f $HOME, $env:USERPROFILE)
+                Set-Variable -Name HOME -Scope Global -Value $env:USERPROFILE -Force
+            } else {
+                Write-Verbose -Message ('Unable to update {0} to {1}' -f $HOME, $env:USERPROFILE)
+            }
+        }
+
+        # reload/invoke bootstrap
+        Write-Verbose -Message '(Test-Path -Path (Join-Path -Path (Resolve-Path -Path ("$env:USERPROFILE\*Documents\WindowsPowerShell")) -ChildPath "bootstrap.ps1"))'
+        Write-Verbose -Message (Test-Path -Path (Join-Path -Path (Resolve-Path -Path ("$env:USERPROFILE\*Documents\WindowsPowerShell")) -ChildPath 'bootstrap.ps1'))
+
+        if (Test-Path -Path (Join-Path -Path (Resolve-Path -Path ("$env:USERPROFILE\*Documents\WindowsPowerShell")) -ChildPath 'bootstrap.ps1')) {
+            $bootstrap = (Join-Path -Path (Resolve-Path -Path ("$env:USERPROFILE\*Documents\WindowsPowerShell")) -ChildPath 'bootstrap.ps1')
+            . $bootstrap 
+            if (Get-Variable -Name 'myPS*' -ValueOnly -ErrorAction Ignore) {
+                Write-Output -InputObject ''
+                Write-Output -InputObject 'My PowerShell Environment:'
+                Get-Variable -Name 'myPS*' | Format-Table
+            } else {
+                Write-Warning -Message 'Failed to enumerate My PowerShell Environment as should have been initialized by bootstrap script'
+            }
+        } else {
+            throw ('Failed to bootstrap: {0}\bootstrap.ps1' -f ("$env:USERPROFILE\*Documents\WindowsPowerShell"))
+        }
+        #(Resolve-Path -Path ("$env:USERPROFILE\*Documents\WindowsPowerShell"))
+
+        Write-Verbose -Message '(Test-Path -Path (Join-Path -Path (Resolve-Path -Path ("$env:USERPROFILE\*Documents\WindowsPowerShell")) -ChildPath "bootstrap.ps1"))'
+        Write-Verbose -Message (Test-Path -Path (Join-Path -Path (Resolve-Path -Path ("$env:USERPROFILE\*Documents\WindowsPowerShell")) -ChildPath 'bootstrap.ps1'))
+    
+        # Reset Verbose host output Preference
+        $VerbosePreference = 'SilentlyContinue'
+        
+        if ($Global:onServer) {
+            Write-Output -InputObject 'Logoff.exe'
+            Start-Sleep -Seconds 5
+            & $env:windir\system32\logoff.exe /v
+        }
     }
-  }
 }
-
-Write-Verbose -Message 'Declaring function Exit-Outlook'
-function Exit-Outlook {
-  [cmdletbinding()]
-  Param()
-
-  if (Get-Variable -Name MyProcesses -ErrorAction Ignore) {
-    Write-Verbose -Message 'Found variable $MyProcesses'
-  } else {
-    Write-Verbose -Message 'Getting my processes'
-    $MyProcesses = Get-ProcessByUser
-  }
-
-  if ('outlook.exe' -in $MyProcesses.Name) {
-    Write-Verbose -Message 'Quitting Outlook'
-    (New-Object -ComObject Outlook.Application).Quit()
-  } else {
-    Write-Verbose -Message 'Outlook is not running'
-  }
-}
+New-Alias -Name logoff -Value Stop-MyXenApps
+New-Alias -Name xa_shutdown -Value Stop-MyXenApps

@@ -6,6 +6,11 @@ $GBCI_Certs = Get-Certificate -StoreName Root -CertStoreLocation .\\LocalMachine
 }
 #>
 
+<#
+    Alternative to PKI module requirement?
+    Get-ChildItem -Path Cert:\LocalMachine -Recurse | where { $_.notafter -le (get-date).AddDays(90) -AND $_.notafter -gt (get-date)} | FL -Property thumbprint,subject,notbefore,notafter
+#>
+
 $GBCI_Certs = Get-ChildItem -Path Cert:\ -Recurse -Exclude "*Disallowed*" -ExpiringInDays 360 | Where-Object -FilterScript {$PSItem.PSPath -notlike "*Disallowed*"} | Select-Object -Property PSPath,Subject,Issuer,Version,DnsNameList,NotAfter -ExpandProperty SignatureAlgorithm
 
 ForEach-Object -InputObject $GBCI_Certs -Process {

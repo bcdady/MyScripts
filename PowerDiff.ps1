@@ -18,15 +18,15 @@ Set-Variable -Name PDSettings -Description ('Settings, from {0}' -f $Local:Setti
 #===============================================================================
 #Region MyScriptInfo
     Write-Verbose -Message '[PowerDiff] Populating $MyScriptInfo'
-    $script:MyCommandName        = $MyInvocation.MyCommand.Name
-    $script:MyCommandPath        = $MyInvocation.MyCommand.Path
-    $script:MyCommandType        = $MyInvocation.MyCommand.CommandType
-    $script:MyCommandModule      = $MyInvocation.MyCommand.Module
-    $script:MyModuleName         = $MyInvocation.MyCommand.ModuleName
-    $script:MyCommandParameters  = $MyInvocation.MyCommand.Parameters
-    $script:MyParameterSets      = $MyInvocation.MyCommand.ParameterSets
+    $script:MyCommandName = $MyInvocation.MyCommand.Name
+    $script:MyCommandPath = $MyInvocation.MyCommand.Path
+    $script:MyCommandType = $MyInvocation.MyCommand.CommandType
+    $script:MyCommandModule = $MyInvocation.MyCommand.Module
+    $script:MyModuleName = $MyInvocation.MyCommand.ModuleName
+    $script:MyCommandParameters = $MyInvocation.MyCommand.Parameters
+    $script:MyParameterSets = $MyInvocation.MyCommand.ParameterSets
     $script:MyRemotingCapability = $MyInvocation.MyCommand.RemotingCapability
-    $script:MyVisibility         = $MyInvocation.MyCommand.Visibility
+    $script:MyVisibility = $MyInvocation.MyCommand.Visibility
 
     if (($null -eq $script:MyCommandName) -or ($null -eq $script:MyCommandPath)) {
         # We didn't get a successful command / script name or path from $MyInvocation, so check with CallStack
@@ -96,29 +96,30 @@ Write-Debug -Message ('  ... logname syntax is {0}\{1}-[date].log' -f $loggingPa
 Write-Verbose -Message 'Declaring Function Import-Settings'
 Function Import-Settings {
     [CmdletBinding()]
-    <#
-        .SYNOPSIS
+  <#
+      .SYNOPSIS
         Import-Settings loads PowerDiff configurations and preferences from a specified json file, such as powerdiff.json
 
-        .DESCRIPTION
+      .DESCRIPTION
         Moving PowerDiff configurations and preferences out of the script body and into a json file makes the script a bit smaller and easier to maintain.
         It also makes user-specific modifications easier to apply and maintain.
         The settings are saved from the json file definitions to an object variable that can be more quickly and consistently access throughout the functions within PowerDiff.ps1.
 
-        .PARAMETER SettingsFileName
-        Specifies the path to the settings file, such as .\powerdiff.json. This can also be defined or modified within PowerDiff.ps1 as $Local:SettingsFileName.
+      .PARAMETER SettingsFileName
+      Specifies the path to the settings file, such as .\powerdiff.json. This can also be defined or modified within PowerDiff.ps1 as $Local:SettingsFileName.
 
-        .PARAMETER PassThru
-        PassThru indicates that the imported settings should be displayed in the console output
+      .PARAMETER PassThru
+      PassThru indicates that the imported settings should be displayed in the console output
 
-        .EXAMPLE
-        Import-Settings
-        Imports and stores the settings as defined in the local powerdiff.json file
+      .EXAMPLE
+      Import-Settings
+      Imports and stores the settings as defined in the local powerdiff.json file
 
-        .EXAMPLE
+      .EXAMPLE
         Import-Settings -SettingsFileName 'my-powerdiff.json' -PassThru
         Imports and stores the settings as defined in .\my-powerdiff.json, and displays 
-    #>
+  #>
+
     param(
         [Parameter(Position = 0)]
         [ValidateNotNullOrEmpty()]
@@ -323,15 +324,14 @@ function Merge-Repository {
         }
     } else {
         Write-Verbose -Message 'No MergePath; 2-way merge'
-    # * * * RFE : Move file-hash comparison into a function, so it can handle folder hash comparison
-    #            if ( -not [bool](Compare-Object -ReferenceObject (get-filehash -Path $SourcePath) (get-filehash -Path $TargetPath) -Property Hash))
-    #            {
-            Write-Verbose -Message "$script:kdiff $SourcePath $TargetPath $script:kdArgs"
-            if ($PSCmdlet.ShouldProcess($SourcePath,$("Merge $SourcePath, $TargetPath"))) {
-                Write-Output -InputObject ('Merging {0} <-> {1}' -f $SourcePath, $TargetPath) | Out-File -FilePath $script:logFile -Append
-                Start-Process -FilePath $script:kdiff -ArgumentList ('-b {0} {1}' -f $SourcePath, $TargetPath) -Wait # $script:kdArgs
-                # In a 2-way merge, with SyncMode=1 kdiff3 can sync both directories, so we can skip the copy/mirror-back activity of the 3-way merge above.
-            }
+        # * * * RFE : Move file-hash comparison into a function, so it can handle folder hash comparison
+        # if ( -not [bool](Compare-Object -ReferenceObject (get-filehash -Path $SourcePath) (get-filehash -Path $TargetPath) -Property Hash))
+        Write-Verbose -Message "$script:kdiff $SourcePath $TargetPath $script:kdArgs"
+        if ($PSCmdlet.ShouldProcess($SourcePath,$("Merge $SourcePath, $TargetPath"))) {
+            Write-Output -InputObject ('Merging {0} <-> {1}' -f $SourcePath, $TargetPath) | Out-File -FilePath $script:logFile -Append
+            Start-Process -FilePath $script:kdiff -ArgumentList ('-b {0} {1}' -f $SourcePath, $TargetPath) -Wait # $script:kdArgs
+            # In a 2-way merge, with SyncMode=1 kdiff3 can sync both directories, so we can skip the copy/mirror-back activity of the 3-way merge above.
+        }
     }
     #EndRegion
 
@@ -362,7 +362,8 @@ function Merge-MyPSFiles {
         $IsFile = $False
         if (Test-Path -Path $repo.SourcePath -PathType Leaf) {
             $IsFile = $True
-        }
+        } # End if Test-Path $SourcePath
+        
         # Test availability of SourcePath, and if missing, re-try Mount-Path function
         if (Test-Path -Path $repo.SourcePath) {
             Write-Verbose -Message ('Confirmed source $repo.SourcePath: {0} is available.' -f $repo.SourcePath)
@@ -370,7 +371,7 @@ function Merge-MyPSFiles {
             # Invoke Mount-Path function, from Sperry module, to map all user's drives
             Write-Warning -Message ('Source {0} is NOT available ... Running Mount-Path.' -f $repo.SourcePath)
             Mount-Path
-        }
+        } # End if Test-Path $SourcePath
 
         # Test availability of TargetPath, and if missing, re-try Mount-Path function
         $TargetParent = Split-Path -Path $repo.SourcePath -Parent
@@ -386,8 +387,8 @@ function Merge-MyPSFiles {
             } else {
                 # Invoke Mount-Path function, from Sperry module, to map all user's drives
                 throw 'TargetPath (parent) is still NOT available.'
-            }
-        }
+            } # End inner if Test-Path $TargetParent
+        } # End outer if Test-Path $TargetParent
 
         if ($IsFile) {
             Write-Verbose -Message ('Specified repository is a file; skipping Compare-Directory')
@@ -395,21 +396,22 @@ function Merge-MyPSFiles {
             # Compare Directories (via contained file hashes) before sending to Merge-Repository
             Write-Verbose -Message ('[bool](Compare-Directory -ReferenceDirectory {0} -DifferenceDirectory {1} -ExcludeFile ""*.orig"","".git*"","".hg*"",""*.md"",""*.tests.*"")' -f $repo.SourcePath, $repo.TargetPath)
             Write-Verbose -Message ('{0}' -f ([bool](Compare-Directory -ReferenceDirectory $($repo.SourcePath) -DifferenceDirectory $($repo.TargetPath) -ExcludeFile '"*.orig"','".git*"','".hg*"','"*.md"','"*.tests.*"')))
-            if (Compare-Directory -ReferenceDirectory {0} -DifferenceDirectory {1} -ExcludeFile '*.orig','.git*','.hg*','*.md','*.tests.*' -f $repo.SourcePath, $repo.TargetPath)) {
+            
+            if (Compare-Directory -ReferenceDirectory {0} -DifferenceDirectory {1} -ExcludeFile '*.orig','.git*','.hg*','*.md','*.tests.*' -f $repo.SourcePath, $repo.TargetPath) {
                 Write-Verbose -Message 'No differences detected ... Skipping merge.'
             } else {
                 Write-Verbose -Message 'Compare-Directory function indicates differences detected between repositories. Proceeding with Merge-Repository.'
                 Write-Verbose -Message ('Merge-Repository -SourcePath {0} -TargetPath {1}' -f $repo.SourcePath, $repo.TargetPath) | Tee-Object -FilePath $script:logFile -Append
                 Merge-Repository -file1 "$($repo.SourcePath)" -file2 "$($repo.TargetPath)"
-            } # end if Compare-Directory
-        }
+            } # End if Compare-Directory
+        } # End if IsFile
     } # End ForEach $MyRepositories
-#EndRegion
+    #EndRegion
 
     Write-Output -InputObject "`n$(Get-Date -Format g) # Ending Merge-MyPSFiles`n" | Tee-Object -FilePath $script:logFile -Append
     # ======== THE END ======================
     Write-Output -InputObject "`n # # # Next: Commit and Sync! # # #`n"
-  #    Write-Output -InputObject '' | Tee-Object -FilePath $script:logFile -Append
+    # Write-Output -InputObject '' | Tee-Object -FilePath $script:logFile -Append
 } # end of function
 
 Write-Verbose -Message 'Declaring Function Merge-Modules'
@@ -424,7 +426,7 @@ function Merge-Modules {
     Write-Output -InputObject "logging to $script:logFile"
     Write-Output -InputObject "$(Get-Date -Format g) # Starting Merge-MyPSFiles" | Tee-Object -FilePath $script:logFile -Append
 
-    # EXAMPLE   : PS .\> .\PowerDiff.ps1 -SourcePath .\Modules\ProfilePal -TargetPath ..\GitHub\
+    # EXAMPLE : PS .\> .\PowerDiff.ps1 -SourcePath .\Modules\ProfilePal -TargetPath ..\GitHub\
     # Technically, per kdiff3 Help, the name of the directory-to-be-merged only needs to be specified once, when the all are the same, just at different root paths.
 
     $MyRepositories = $Script:PDSettings | Select-Object -ExpandProperty RepositorySets
@@ -440,7 +442,6 @@ function Merge-Modules {
     }
 
     #Region Merge Modules
-    
     # Declare root path of where modules should be merged To
     $ModulesRepo = Join-Path -Path 'R:' -ChildPath 'IT\repo\Modules'
 

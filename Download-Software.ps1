@@ -4,8 +4,7 @@
 
 $destinationDir = Join-Path -Path $HOME -ChildPath 'Downloads' -ErrorAction Stop
 
-Function Initialize-PackageSettings
-{
+Function Initialize-PackageSettings {
     [CmdletBinding(SupportsShouldProcess)]
     param (
         # Parameter help description

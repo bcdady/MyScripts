@@ -1,13 +1,21 @@
 
+# See also https://regex101.com/library
+
+# Find / replace line-breaks and white spaces before a {
+(\S)([\s\n]{2,}){
+
 # Find / replace line-breaks from between Function {
 [F|f]unction\s+(\S+)[\s\n]+{ // Function $1 {
 
-# Find / replace line-breaks between ) {
-\)[\s\n]+{ // ) {
+# Find / replace line-breaks between Function { , OR , ) {
+([F|f]unction)[\s\n]{2,}(\S+)[\s\n]+|\))[\s\n]{2,}{ // $1 {
 
 # Find / replace line-breaks from between } else {
-}[\s\n]+else[\s\n]+{ // } else {
+}[\s\n]{2,}else[\s\n]+{ // } else {
+
+# Find / replace single backslash with doubles (e.g. for json)
+([^\\])\\([^\\]) // $1\\\\$2
 
 # Find / replace line-breaks from between } elseif
-}[\s\n]+elseif[\s\n]+{ // } elseif {
+}[\s\n]+(else|elseif)[\s\n]+{ // } $1 {
     
