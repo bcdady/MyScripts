@@ -63,6 +63,18 @@ Write-Output -InputObject ' # # Initiating PowerShell Environment Bootstrap #'
 Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
 
 #Region HostOS
+    <#
+        Get-Variable -Name Is* -Exclude ISERecent | FT
+        
+        Name                           Value
+        ----                           -----
+        IsAdmin                        False
+        IsCoreCLR                      True
+        IsLinux                        False
+        IsMacOS                        True
+        IsWindows                      False
+    #>
+    
     # Detect older versions of PowerShell and add in new automatic variables for cross-platform consistency
     if ($Host.Version.Major -lt 5) {
         $Global:IsWindows = $true
@@ -76,16 +88,22 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
         $IsAdmin = (([security.principal.windowsprincipal] [security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     }
 
-    if ((Get-Variable -Name IsLinux -ErrorAction Ignore) -eq $true) {
+    if (Get-Variable -Name IsLinux -ErrorAction Ignore) {
         $hostOS = 'Linux'
         $hostOSCaption = $hostOS
+        if (-not ($env:ComputerName)) {
+            $env:ComputerName = $(hostname)
+        }
         # Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
         #$IsAdmin = ... ?
     } 
 
-    if ((Get-Variable -Name IsOSX -ErrorAction Ignore) -eq $true) { 
-        $hostOS = 'OSX'
+    if (Get-Variable -Name IsMacOS -ErrorAction Ignore) { 
+        $hostOS = 'macOS'
         $hostOSCaption = $hostOS
+        if (-not ($env:ComputerName)) {
+            $env:ComputerName = $(hostname)
+        }
         # Check admin / root rights / role
         #$IsAdmin = ... ?
     } 
@@ -104,17 +122,6 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
 #End Region
 
 #Region Check$HOME
-    <#
-        Get-Variable -Name Is* -Exclude ISERecent | Format-Table -AutoSize
-            Name                           Value
-            ----                           -----
-            IsAdmin                        False
-            IsCoreCLR                      True
-            IsLinux                        False
-            IsOSX                          True
-            IsWindows                      False
-    #>
-
     # Derive full path to user's $HOME and PowerShell folders
     if ($IsWindows) {
         Write-Verbose -Message 'Checking if $HOME is on the Windows SystemDrive'
@@ -173,8 +180,8 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
         }
     } else {
         # Need to confirm / test this on non-windows OS
-        $myPSHome = Join-Path -Path $HOME -ChildPath '*Documents\WindowsPowerShell' -Resolve
-        Set-Variable -Name myPSHome -Value (Join-Path -Path $HOME -ChildPath '*Documents\WindowsPowerShell' -Resolve) -Force -Scope Global
+        #$myPSHome = Join-Path -Path $HOME -ChildPath '.config/powershell' -Resolve
+        Set-Variable -Name myPSHome -Value (Join-Path -Path $HOME -ChildPath '.config/powershell' -Resolve) -Force -Scope Global
     }
 
     if (Test-Path -Path $myPSHome) {
@@ -260,7 +267,7 @@ write-output -InputObject '   # Get-CustomModule | Format-Table -Property Name, 
 
 write-output -InputObject '   # To view additional available modules, run: Get-Module -ListAvailable'
 Write-Output -InputObject '   # To view cmdlets available in a given module, run:'
-Write-Output -InputObject '   #  Get-Command -Module <ModuleName>'
+Write-Output -InputObject '   # Get-Command -Module <ModuleName>'
 
 Write-Output -InputObject ''
 Write-Output -InputObject ' # # PowerShell Environment Bootstrap Complete #'
