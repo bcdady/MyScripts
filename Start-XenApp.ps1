@@ -194,6 +194,9 @@ function Get-SystemCitrixInfo {
         $ErrorActionPreference = 'SilentlyContinue'
         $Local:Receiver = Get-ChildItem -LiteralPath HKCU:\Software\Citrix\Receiver\InstallDetect | ForEach-Object -Process {Get-ItemProperty -Path $($PSItem.Name.Replace('HKEY_CURRENT_USER\','HKCU:\')) | Where-Object -FilterScript {$PSItem.DisplayName -like 'Citrix Receiver*'} | Select-Object -Property DisplayName,DisplayVersion}
         $Local:Receiver = $Local:Receiver | Sort-Object -Property DisplayVersion -Descending -Unique
+
+        #HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\CitrixOnlinePluginPackWeb
+        # DisplayName example: 'Citrix Receiver 4.9 LTSR'
         $ErrorActionPreference = 'Continue'
         try {
             $Local:CitrixName    = $Local:Receiver.DisplayName
