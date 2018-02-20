@@ -1,44 +1,44 @@
 ﻿#requires -version 2
 
 <#
-.SYNOPSIS
-    Gets folder sizes using COM and with a fallback to robocopy.exe with the logging option,
-    which makes it not actually copy or move files, but just list them, and the end
-    summary result is parsed to extract the relevant data.
+    .SYNOPSIS
+        Gets folder sizes using COM and with a fallback to robocopy.exe with the logging option,
+        which makes it not actually copy or move files, but just list them, and the end
+        summary result is parsed to extract the relevant data.
 
-    This apparently is much faster than .NET and Get-ChildItem in PowerShell.
+        This apparently is much faster than .NET and Get-ChildItem in PowerShell.
 
-    The properties of the objects will be different based on which method is used, but
-    the "TotalBytes" property is always populated if the directory size was successfully
-    retrieved. Otherwise you should get a warning.
+        The properties of the objects will be different based on which method is used, but
+        the "TotalBytes" property is always populated if the directory size was successfully
+        retrieved. Otherwise you should get a warning.
 
-    BSD 3-clause license.
+        BSD 3-clause license.
 
-    Copyright (C) 2015, Joakim Svendsen
-    All rights reserved.
-    Svendsen Tech.
+        Copyright (C) 2015, Joakim Svendsen
+        All rights reserved.
+        Svendsen Tech.
 
-.PARAMETER Path
-    Path or paths to measure size of.
+    .PARAMETER Path
+        Path or paths to measure size of.
 
-.PARAMETER Precision
-    Number of digits after decimal point in rounded numbers.
+    .PARAMETER Precision
+        Number of digits after decimal point in rounded numbers.
 
-.PARAMETER RoboOnly
-    Do not use COM, only robocopy, for always getting full details.
+    .PARAMETER RoboOnly
+        Do not use COM, only robocopy, for always getting full details.
 
-.EXAMPLE
-    . .\Get-FolderSize.ps1
-    PS C:\> 'C:\Windows', 'E:\temp' | Get-FolderSize
+    .EXAMPLE
+        . .\Get-FolderSize.ps1
+        PS C:\> 'C:\Windows', 'E:\temp' | Get-FolderSize
 
-.EXAMPLE
-    Get-FolderSize -Path Z:\Database -Precision 2
+    .EXAMPLE
+        Get-FolderSize -Path Z:\Database -Precision 2
 
-.EXAMPLE
-    Get-FolderSize -Path Z:\Database -RoboOnly
+    .EXAMPLE
+        Get-FolderSize -Path Z:\Database -RoboOnly
 
-.LINK
-    http://www.powershelladmin.com/wiki/Get_Folder_Size_with_PowerShell,_Blazingly_Fast
+    .LINK
+        http://www.powershelladmin.com/wiki/Get_Folder_Size_with_PowerShell,_Blazingly_Fast
 #>
 function Get-FolderSize {
     [CmdletBinding()]
