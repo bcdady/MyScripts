@@ -1,5 +1,5 @@
-#!/usr/local/bin/powershell
-#Requires -Version 3 -Module PSLogger
+#!/usr/local/bin/pwsh
+#Requires -Version 3
 #========================================
 # NAME      : Microsoft.PowerShell_profile.ps1
 # LANGUAGE  : Microsoft PowerShell

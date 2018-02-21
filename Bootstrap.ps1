@@ -76,10 +76,10 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
     #>
     
     # Detect older versions of PowerShell and add in new automatic variables for cross-platform consistency
+    $Global:IsAdmin   = $False
     if ($Host.Version.Major -le 5) {
         $Global:IsWindows = $true
         $Global:PSEdition = 'Windows'
-        $Global:IsAdmin   = $False
         $Global:IsCoreCLR = $False
         $Global:IsLinux   = $False
         $Global:IsMacOS   = $False
@@ -128,7 +128,7 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
     }
 #End Region HostOS
 
-#Region Check$HOME
+#Region Check $HOME
     # Derive full path to user's $HOME and PowerShell folders
     if ($IsWindows) {
         Write-Verbose -Message 'Checking if $HOME is on the Windows SystemDrive'
@@ -200,8 +200,7 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
         throw 'Failed to establish / locate path to $HOME\*Documents\WindowsPowerShell. Resolve and reload $PROFILE'
         break
     }
-
-    #End Region
+#End Region
 
 #Region ModulePath
     <# check and conditionally update/fix PSModulePath
@@ -217,7 +216,7 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
             Set-Variable -Name HOME -Value $(Split-Path -Path (Split-Path -Path $myPSHome -Parent) -Parent)
         }
 
-        #Define modules and scripts folders within user's PowerShell folder, creating the SubFolders if necessary
+        #Define modules, scripts, and log folders within user's PowerShell folder, creating the SubFolders if necessary
         $myPSModulesPath = (Join-Path -Path $myPSHome -ChildPath 'Modules')
         if (-not (Test-Path -Path $myPSModulesPath)) {
             New-Item -Path $myPSHome -ItemType Directory -Name 'Modules'
@@ -248,19 +247,17 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
 
     Write-Verbose -Message ('My PS Modules Path: {0}' -f $myPSModulesPath)
 
-    Write-Debug -Message ('($myPSModulesPath -in @($env:PSMODULEPATH -split $Private:SplitChar) = {0}' -f ($myPSModulesPath -in @($env:PSMODULEPATH -split $Private:SplitChar)))
-    if (($null -ne $myPSModulesPath) -and (-not ($myPSModulesPath -in @($env:PSMODULEPATH -split $Private:SplitChar)))) {
-        # Improve to only conditionally modify 
-        # $env:PSMODULEPATH = $myPSHome\Modules"; "$PSHome\Modules"; "${env:ProgramFiles(x86)}\WindowsPowerShell\Modules"; "$env:ProgramFiles\WindowsPowerShell\Modules") -join ';'
-        Write-Verbose -Message ('Adding Modules Path: {0} to $env:PSMODULEPATH' -f $myPSModulesPath) -Verbose
-        $env:PSMODULEPATH += "$Private:SplitChar$myPSModulesPath"
+        Write-Debug -Message ('($myPSModulesPath -in @($Env:PSModulePath -split $Private:SplitChar) = {0}' -f ($myPSModulesPath -in @($Env:PSModulePath -split $Private:SplitChar)))
+        if (($null -ne $myPSModulesPath) -and (-not ($myPSModulesPath -in @($Env:PSModulePath -split $Private:SplitChar)))) {
+            Write-Verbose -Message ('Adding Modules Path: {0} to $Env:PSModulePath' -f $myPSModulesPath) -Verbose
+            $Env:PSModulePath += "$Private:SplitChar$myPSModulesPath"
 
-        # post-update cleanup
-        if (Test-Path -Path $myPSScriptsPath) {
-            & $myPSScriptsPath\Cleanup-ModulePath.ps1
-            $env:PSMODULEPATH
+            # post-update cleanup
+            if (Test-Path -Path $myPSScriptsPath) {
+                & $myPSScriptsPath\Cleanup-ModulePath.ps1
+                Write-Output -InputObject $Env:PSModulePath
+            }
         }
-    }
 #End Region ModulePath
 
 Write-Verbose -Message 'Declaring function Get-CustomModule'

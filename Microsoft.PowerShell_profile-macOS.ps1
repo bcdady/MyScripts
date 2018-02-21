@@ -1,5 +1,5 @@
-#!/usr/local/bin/powershell
-#Requires -Version 6 -module PSLogger
+#!/usr/local/bin/pwsh
+#Requires -Version 5
 #========================================
 # NAME      : Microsoft.PowerShell_profile-macOS.ps1
 # LANGUAGE  : Microsoft PowerShell Core
@@ -68,6 +68,17 @@ param ()
 Write-Output -InputObject ' # Loading PowerShell macOS Profile Script #'
 Write-Verbose -Message (' ... from {0} # ' -f $MyScriptInfo.CommandPath)
 
+$PSDefaultParameterValues = @{
+    'Format-Table:autosize' = $true
+    'Format-Table:wrap'     = $true
+    'Get-Help:Examples'     = $true
+    'Get-Help:Online'       = $true
+    'Enter-PSSession:Credential'          = {Get-Variable -Name my2acct -ErrorAction Ignore}
+    'Enter-PSSession:EnableNetworkAccess' = $true
+    'New-PSSession:Credential'            = {Get-Variable -Name my2acct -ErrorAction Ignore}
+    'New-PSSession:EnableNetworkAccess'   = $true
+}
+
 # Define custom prompt format:
 function prompt {
     [CmdletBinding()]
@@ -91,6 +102,11 @@ if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType
     Write-Output -InputObject ''
 
     <#
+        Write-Verbose -Message 'Initializing Set-ConsoleTheme.ps1'
+        . (Join-Path -Path $myScriptsPath -ChildPath 'Set-ConsoleTheme.ps1')
+        Write-Verbose -Message 'Set-ConsoleTheme'
+        Set-ConsoleTheme    
+  
         # [bool]($NetInfo.IPAddress -match "^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$") -or
         if (Test-Connection -ComputerName $env:USERDNSDOMAIN -Quiet) {
             $atWork = $true
@@ -136,37 +152,33 @@ function Save-Credential {
     )
 
     $SaveCredential = $false
-    if ($Global:onServer) {
-        Write-Verbose -Message ('Starting Save-Credential $Global:onServer = {0}' -f $Global:onServer)
-        $VarValueSet = [bool](Get-Variable -Name $Variable -ValueOnly -ErrorAction SilentlyContinue)
-        Write-Verbose -Message ('$VarValueSet = ''{0}''' -f $VarValueSet)
-        if ($VarValueSet) {
-            Write-Warning -Message ('Variable ''{0}'' is already defined' -f $Variable)
-            if ((read-host -prompt ('Would you like to update/replace the credential stored in {0}`? [y]|n' -f $Variable)) -ne 'y') {
-                Write-Warning -Message 'Ok. Aborting Save-Credential.'
-            }
-        } else {
-            $SaveCredential = $true
-        }
-
-        Write-Verbose -Message ('$SaveCredential = {0}' -f $SaveCredential)
-        if ($SaveCredential) {
-            if ($USERNAME -NotMatch '\d$') {
-                $UName = $($USERNAME + '2')
-            } else {
-                $UName = $USERNAME
-            }
-
-            Write-Output -InputObject ''
-            Write-Output -InputObject ' # Prompting to capture elevated credentials. #'
-            Write-Output -InputObject ' ...'
-            Set-Variable -Name $Variable -Value $(Get-Credential -UserName $UName -Message 'Store admin credentials for convenient use later.') -Scope Global -Description 'Stored admin credentials for convenient re-use.'
-            if ($?) {
-                Write-Output -InputObject ('Elevated credentials stored in variable: {0}.' -f $Variable)
-            }
+    Write-Verbose -Message ('Starting Save-Credential $Global:onServer = {0}' -f $Global:onServer)
+    $VarValueSet = [bool](Get-Variable -Name $Variable -ValueOnly -ErrorAction SilentlyContinue)
+    Write-Verbose -Message ('$VarValueSet = ''{0}''' -f $VarValueSet)
+    if ($VarValueSet) {
+        Write-Warning -Message ('Variable ''{0}'' is already defined' -f $Variable)
+        if ((read-host -prompt ('Would you like to update/replace the credential stored in {0}`? [y]|n' -f $Variable)) -ne 'y') {
+            Write-Warning -Message 'Ok. Aborting Save-Credential.'
         }
     } else {
-        Write-Verbose -Message 'Skipping Save-Credential'
+        $SaveCredential = $true
+    }
+
+    Write-Verbose -Message ('$SaveCredential = {0}' -f $SaveCredential)
+    if ($SaveCredential) {
+        if ($USERNAME -NotMatch '\d$') {
+            $UName = $($USERNAME + '2')
+        } else {
+            $UName = $USERNAME
+        }
+
+        Write-Output -InputObject ''
+        Write-Output -InputObject ' # Prompting to capture elevated credentials. #'
+        Write-Output -InputObject ' ...'
+        Set-Variable -Name $Variable -Value $(Get-Credential -UserName $UName -Message 'Store admin credentials for convenient use later.') -Scope Global -Description 'Stored admin credentials for convenient re-use.'
+        if ($?) {
+            Write-Output -InputObject ('Elevated credentials stored in variable: {0}.' -f $Variable)
+        }
     }
 } # end Save-Credential
 
@@ -191,44 +203,23 @@ if (Get-Variable -Name IsAdmin -ErrorAction Ignore) {
 # else ... if not local admin, we don't have permissions to update help files.
 #End Region
 
-Write-Output -InputObject '# [PSEdit] #'
-if (-not($Env:PSEdit)) {
-    # if (Test-Path -Path $HOME\vscode\app\code.exe -PathType Leaf) {
-    #     Assert-PSEdit -Path (Resolve-Path -Path $HOME\vscode\app\code.exe)
-    # } else {
-        Assert-PSEdit
-    # }
-}
-Write-Output -InputObject ''
-
-# if connected to work network, initiate logging on to work, via Set-Workplace function
-if ($atWork) {
-    $thisHour = (Get-Date -DisplayHint Time).Hour
-    if (($thisHour -ge 6) -and ($thisHour -le 18)) {
-        Write-Verbose -Message 'Save-Credential'
-        Save-Credential
-        if ((-not $Global:onServer) -or $Global:OnXAHost) {
-            Write-Output -InputObject ' # # # Start-CitrixSession # # #'
-            # From .\Scripts\Start-XenApp.ps1
-            Start-CitrixSession
-        } elseif (-not $Global:onServer) {
-            # From .\Scripts\GBCI-XenApp.ps1
-            Write-Output -InputObject ' # # # Set-Workplace -Zone Office # # #'
-            Set-Workplace -Zone Office
-        }
+<#
+    Write-Output -InputObject '# [PSEdit] #'
+    if (-not($Env:PSEdit)) {
+        # if (Test-Path -Path $HOME\vscode\app\code.exe -PathType Leaf) {
+        #     Assert-PSEdit -Path (Resolve-Path -Path $HOME\vscode\app\code.exe)
+        # } else {
+            Assert-PSEdit
+        # }
     }
-} else {
-    Dismount-Path
-    Write-Output -InputObject "`n # # # Work network not detected. Run 'Set-Workplace -Zone Remote' to switch modes.`n`n"
-}
+    Write-Output -InputObject ''
+#>
 
-# Write-Output -InputObject '# Pre-log backup #'
-# Write-Output -InputObject ('$VerbosePreference: {0} is {1}' -f $VerbosePreference, $IsVerbose)
+<#
 # Backup local PowerShell log files
 Write-Output -InputObject 'Archive PowerShell logs'
 Backup-Logs
-# Write-Output -InputObject '# Post-log backup #'
-# Write-Output -InputObject ('$VerbosePreference: {0} is {1}' -f $VerbosePreference, $IsVerbose)
+#>
 
 Write-Output -InputObject ' # End of PowerShell macOS Profile Script #'
 
