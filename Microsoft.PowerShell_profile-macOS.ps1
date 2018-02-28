@@ -1,5 +1,5 @@
 #!/usr/local/bin/pwsh
-#Requires -Version 5
+#Requires -Version 6 -module PSLogger
 #========================================
 # NAME      : Microsoft.PowerShell_profile-macOS.ps1
 # LANGUAGE  : Microsoft PowerShell Core
@@ -10,6 +10,13 @@
 [CmdletBinding()]
 param ()
 #Set-StrictMode -Version latest
+
+<#
+    # For testing: Set Verbose host output Preference
+    $VerbosePreference = 'Inquire'
+    '$IsVerbose'
+    $IsVerbose
+#>
 
 #Region MyScriptInfo
     Write-Verbose -Message '[CurrentUserCurrentHost Profile] Populating $MyScriptInfo'
@@ -94,19 +101,22 @@ function prompt {
     return "[{0} @ {1}]`n{2}{3}{4}{5}" -f $env:ComputerName, $pwd.Path, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel
 }
 
+# GIT_EXEC_PATH determines where Git looks for its sub-programs (like git-commit, git-diff, and others).
+#  You can check the current setting by running git --exec-path.
+$Env:GIT_EXEC_PATH = Join-Path -path $HOME -ChildPath 'Resources\pgit\bin\git.exe'
 Write-Debug -Message (' # # # $VerbosePreference: {0} # # #' -f $VerbosePreference)
 Write-Verbose -Message 'Checking that .\scripts\ folder is available'
 #$atWork = $false
 if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType Container)) {
     Write-Verbose -Message 'Loading scripts from .\scripts\ ...'
     Write-Output -InputObject ''
-
     <#
         Write-Verbose -Message 'Initializing Set-ConsoleTheme.ps1'
         . (Join-Path -Path $myScriptsPath -ChildPath 'Set-ConsoleTheme.ps1')
         Write-Verbose -Message 'Set-ConsoleTheme'
         Set-ConsoleTheme    
   
+    <#
         # [bool]($NetInfo.IPAddress -match "^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$") -or
         if (Test-Connection -ComputerName $env:USERDNSDOMAIN -Quiet) {
             $atWork = $true
@@ -133,7 +143,6 @@ if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType
         Write-Verbose -Message 'Initializing Get-MyNewHelp.ps1'
         . $myPSScriptsPath\Get-MyNewHelp.ps1
     #>
-
 } else {
     Write-Warning -Message ('Failed to locate Scripts folder {0}; run any scripts.' -f $myPSScriptsPath)
 }
@@ -203,23 +212,21 @@ if (Get-Variable -Name IsAdmin -ErrorAction Ignore) {
 # else ... if not local admin, we don't have permissions to update help files.
 #End Region
 
-<#
-    Write-Output -InputObject '# [PSEdit] #'
-    if (-not($Env:PSEdit)) {
-        # if (Test-Path -Path $HOME\vscode\app\code.exe -PathType Leaf) {
-        #     Assert-PSEdit -Path (Resolve-Path -Path $HOME\vscode\app\code.exe)
-        # } else {
+Write-Output -InputObject '# [PSEdit] #'
+if (-not($Env:PSEdit)) {
+    if (Test-Path -Path $HOME\vscode\app\code.exe -PathType Leaf) {
+        Assert-PSEdit -Path (Resolve-Path -Path $HOME\vscode\app\code.exe)
+    } else {
             Assert-PSEdit
-        # }
     }
-    Write-Output -InputObject ''
-#>
+}
+Write-Output -InputObject ''
 
-<#
+
 # Backup local PowerShell log files
 Write-Output -InputObject 'Archive PowerShell logs'
 Backup-Logs
-#>
+# Write-Output -InputObject ('$VerbosePreference: {0} is {1}' -f $VerbosePreference, $IsVerbose)
 
 Write-Output -InputObject ' # End of PowerShell macOS Profile Script #'
 

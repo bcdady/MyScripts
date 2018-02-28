@@ -1,5 +1,5 @@
 #!/usr/local/bin/pwsh
-#Requires -Version 3
+#Requires -Version 3 -module PSLogger
 #========================================
 # NAME      : Microsoft.PowerShell_profile.ps1
 # LANGUAGE  : Microsoft PowerShell
@@ -12,10 +12,10 @@ param ()
 #Set-StrictMode -Version latest
 
 <#
-# For testing: Set Verbose host output Preference
-$VerbosePreference = 'Inquire'
-'$IsVerbose'
-$IsVerbose
+    # For testing: Set Verbose host output Preference
+    $VerbosePreference = 'Inquire'
+    '$IsVerbose'
+    $IsVerbose
 #>
 
 #Region MyScriptInfo
@@ -75,6 +75,19 @@ $IsVerbose
 Write-Output -InputObject ' # Loading PowerShell $Profile CurrentUserCurrentHost #'
 Write-Verbose -Message (' ... from {0} # ' -f $MyScriptInfo.CommandPath)
 
+# https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_prompts
+Write-Verbose -Message 'Declaring custom prompt'
+function prompt {
+    if (-not (Get-Variable -Name IsAdmin -ValueOnly -ErrorAction Ignore)) {
+        $IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')
+    }
+    if ( $IsAdmin ) { $AdminPrompt = '[ADMIN]:' } else { $AdminPrompt = '' }
+    if ( Get-Variable -Name PSDebugContext -ValueOnly -ErrorAction Ignore) { $DebugPrompt = '[DEBUG]:' } else { $DebugPrompt = '' }
+    if ( Get-Variable -Name PSConsoleFile -ValueOnly -ErrorAction Ignore)  { $PSCPrompt = "[PSConsoleFile: $PSConsoleFile]" } else { $PSCPrompt = '' }
+    if ( $NestedPromptLevel -ge 1 ) { $PromptLevel = 'PS .\> >' } else { $PromptLevel = 'PS .\>' }
+
+    return "[{0} @ {1}]`n{2}{3}{4}{5}" -f $Env:ComputerName, $pwd.Path, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel
+}
 #Region Bootstrap
     # Moved HOME / MyPSHome, Modules, and Scripts variable determination to bootstrap script
     Write-Verbose -Message '(Get-Variable -Name "myPSHome" -ErrorAction Ignore)'
@@ -97,13 +110,20 @@ Write-Verbose -Message (' ... from {0} # ' -f $MyScriptInfo.CommandPath)
                 Write-Output -InputObject 'My PowerShell Environment:'
                 Get-Variable -Name 'myPS*' | Format-Table
             } else {
-                Write-Warning -Message 'Failed to enumerate My PowerShell Environment as should have been initialized by bootstrap script: {0}' -f ((Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'bootstrap.ps1'))
+                Write-Warning -Message ('Failed to enumerate My PowerShell Environment as should have been initialized by bootstrap script: {0}' -f ((Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'bootstrap.ps1')))
             }
         } else {
             throw ('Failed to bootstrap: {0}\bootstrap.ps1' -f $Private:MyCommandPath)
         }
     }
 #End Region  
+
+# Call Set-ConsoleTitle, from ProfilePal module
+Set-ConsoleTitle
+
+# Display execution policy, for convenience
+Write-Output -InputObject 'Current PS execution policy is:'
+Get-ExecutionPolicy -List | Format-Table -AutoSize
 
 # Detect host OS and then jump to the OS specific profile sub-script
 if ($IsLinux) {

@@ -1,4 +1,4 @@
-#!/usr/local/bin/powershell
+#!/usr/local/bin/pwsh
 #Requires -Version 6 -module PSLogger
 #========================================
 # NAME      : Microsoft.PowerShell_profile-Linux.ps1
@@ -10,6 +10,13 @@
 [CmdletBinding()]
 param ()
 #Set-StrictMode -Version latest
+
+<#
+    # For testing: Set Verbose host output Preference
+    $VerbosePreference = 'Inquire'
+    '$IsVerbose'
+    $IsVerbose
+#>
 
 #Region MyScriptInfo
     Write-Verbose -Message '[CurrentUserCurrentHost Profile] Populating $MyScriptInfo'
@@ -68,6 +75,17 @@ param ()
 Write-Output -InputObject ' # Loading PowerShell Linux Profile Script #'
 Write-Verbose -Message (' ... from {0} # ' -f $MyScriptInfo.CommandPath)
 
+$PSDefaultParameterValues = @{
+    'Format-Table:autosize' = $true
+    'Format-Table:wrap'     = $true
+    'Get-Help:Examples'     = $true
+    'Get-Help:Online'       = $true
+    'Enter-PSSession:Credential'          = {Get-Variable -Name my2acct -ErrorAction Ignore}
+    'Enter-PSSession:EnableNetworkAccess' = $true
+    'New-PSSession:Credential'            = {Get-Variable -Name my2acct -ErrorAction Ignore}
+    'New-PSSession:EnableNetworkAccess'   = $true
+}
+
 # Define custom prompt format:
 function prompt {
     [CmdletBinding()]
@@ -83,12 +101,20 @@ function prompt {
     return "[{0} @ {1}]`n{2}{3}{4}{5}" -f $env:ComputerName, $pwd.Path, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel
 }
 
+# GIT_EXEC_PATH determines where Git looks for its sub-programs (like git-commit, git-diff, and others).
+#  You can check the current setting by running git --exec-path.
+$Env:GIT_EXEC_PATH = Join-Path -path $HOME -ChildPath 'Resources\pgit\bin\git.exe'
 Write-Debug -Message (' # # # $VerbosePreference: {0} # # #' -f $VerbosePreference)
 Write-Verbose -Message 'Checking that .\scripts\ folder is available'
 #$atWork = $false
 if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType Container)) {
     Write-Verbose -Message 'Loading scripts from .\scripts\ ...'
     Write-Output -InputObject ''
+    <#
+        Write-Verbose -Message 'Initializing Set-ConsoleTheme.ps1'
+        . (Join-Path -Path $myScriptsPath -ChildPath 'Set-ConsoleTheme.ps1')
+        Write-Verbose -Message 'Set-ConsoleTheme'
+        Set-ConsoleTheme    
 
     <#
         # [bool]($NetInfo.IPAddress -match "^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$") -or
@@ -136,7 +162,6 @@ function Save-Credential {
     )
 
     $SaveCredential = $false
-    if ($Global:onServer) {
         Write-Verbose -Message ('Starting Save-Credential $Global:onServer = {0}' -f $Global:onServer)
         $VarValueSet = [bool](Get-Variable -Name $Variable -ValueOnly -ErrorAction SilentlyContinue)
         Write-Verbose -Message ('$VarValueSet = ''{0}''' -f $VarValueSet)
@@ -165,9 +190,6 @@ function Save-Credential {
                 Write-Output -InputObject ('Elevated credentials stored in variable: {0}.' -f $Variable)
             }
         }
-    } else {
-        Write-Verbose -Message 'Skipping Save-Credential'
-    }
 } # end Save-Credential
 
 New-Alias -Name rename -Value Rename-Item -ErrorAction SilentlyContinue
@@ -193,41 +215,18 @@ if (Get-Variable -Name IsAdmin -ErrorAction Ignore) {
 
 Write-Output -InputObject '# [PSEdit] #'
 if (-not($Env:PSEdit)) {
-    # if (Test-Path -Path $HOME\vscode\app\code.exe -PathType Leaf) {
-    #     Assert-PSEdit -Path (Resolve-Path -Path $HOME\vscode\app\code.exe)
-    # } else {
+    if (Test-Path -Path $HOME\vscode\app\code.exe -PathType Leaf) {
+        Assert-PSEdit -Path (Resolve-Path -Path $HOME\vscode\app\code.exe)
+    } else {
         Assert-PSEdit
-    # }
+    }
 }
 Write-Output -InputObject ''
 
-# if connected to work network, initiate logging on to work, via Set-Workplace function
-if ($atWork) {
-    $thisHour = (Get-Date -DisplayHint Time).Hour
-    if (($thisHour -ge 6) -and ($thisHour -le 18)) {
-        Write-Verbose -Message 'Save-Credential'
-        Save-Credential
-        if ((-not $Global:onServer) -or $Global:OnXAHost) {
-            Write-Output -InputObject ' # # # Start-CitrixSession # # #'
-            # From .\Scripts\Start-XenApp.ps1
-            Start-CitrixSession
-        } elseif (-not $Global:onServer) {
-            # From .\Scripts\GBCI-XenApp.ps1
-            Write-Output -InputObject ' # # # Set-Workplace -Zone Office # # #'
-            Set-Workplace -Zone Office
-        }
-    }
-} else {
-    Dismount-Path
-    Write-Output -InputObject "`n # # # Work network not detected. Run 'Set-Workplace -Zone Remote' to switch modes.`n`n"
-}
 
-# Write-Output -InputObject '# Pre-log backup #'
-# Write-Output -InputObject ('$VerbosePreference: {0} is {1}' -f $VerbosePreference, $IsVerbose)
 # Backup local PowerShell log files
 Write-Output -InputObject 'Archive PowerShell logs'
 Backup-Logs
-# Write-Output -InputObject '# Post-log backup #'
 # Write-Output -InputObject ('$VerbosePreference: {0} is {1}' -f $VerbosePreference, $IsVerbose)
 
 Write-Output -InputObject ' # End of PowerShell Linux Profile Script #'
