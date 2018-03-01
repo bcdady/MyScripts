@@ -1,4 +1,4 @@
-#!/usr/local/bin/powershell
+#!/usr/local/bin/pwsh
 #Requires -Version 3
 #========================================
 # NAME      : Bootstrap.ps1
@@ -10,7 +10,7 @@
 #========================================
 [CmdletBinding()]
 param()
-Set-StrictMode -Version latest
+#Set-StrictMode -Version latest
 
 #Region MyScriptInfo
     Write-Verbose -Message '[Bootstrap] Populating $MyScriptInfo'
@@ -76,13 +76,21 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
     #>
     
     # Detect older versions of PowerShell and add in new automatic variables for cross-platform consistency
-    $Global:IsAdmin   = $False
     if ($Host.Version.Major -le 5) {
         $Global:IsWindows = $true
-        $Global:PSEdition = 'Windows'
+        $Global:PSEdition = 'Desktop'
         $Global:IsCoreCLR = $False
         $Global:IsLinux   = $False
         $Global:IsMacOS   = $False
+        $Global:IsAdmin   = $False
+    }
+
+    # Setup common variables for PS Core editions
+    if (Get-Variable -Name IsWindows -ValueOnly -ErrorAction Ignore) {
+        $hostOS = 'Windows'
+        $hostOSCaption = $((Get-CimInstance -ClassName Win32_OperatingSystem -Property Caption).Caption) -replace 'Microsoft ', ''
+        # Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
+        $Global:IsAdmin = (([security.principal.windowsprincipal] [security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     }
 
     if (Get-Variable -Name IsLinux -ValueOnly -ErrorAction Ignore) {
@@ -91,8 +99,6 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
         if (-not (Test-Path -LiteralPath env:ComputerName -ErrorAction Ignore)) { 
             $env:ComputerName = $(hostname)
         }
-        # Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
-        #$IsAdmin = ... ?
     }
 
     if (Get-Variable -Name IsMacOS -ValueOnly -ErrorAction Ignore) { 
@@ -101,19 +107,10 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
         if (-not (Test-Path -LiteralPath env:ComputerName -ErrorAction Ignore)) { 
             $env:ComputerName = $(hostname)
         }
-        # Check admin / root rights / role
-        #$IsAdmin = ... ?
     } 
 
-    if ($IsWindows) {
-        $hostOS = 'Windows'
-        $hostOSCaption = $((Get-CimInstance -ClassName Win32_OperatingSystem -Property Caption).Caption) -replace 'Microsoft ', ''
-        # Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
-        $IsAdmin = (([security.principal.windowsprincipal] [security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    }
-
     # ' # Test output #'
-    # Get-Variable -Name Is* -Exclude ISERecent | FT
+    # Get-Variable -Name Is* -Exclude ISERecent Format-Table
 
     Write-Output -InputObject ''
     Write-Output -InputObject " # $ShellId $($Host.version.toString().substring(0,3)) $PSEdition on $hostOSCaption - $env:ComputerName #"
@@ -122,7 +119,6 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
     $env:HostOS = $hostOS
 
     $Global:onServer = $false
-    $Global:onXAHost = $false
     if ($hostOSCaption -like '*Windows Server*') {
         $Global:onServer = $true
     }
@@ -131,6 +127,14 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
 #Region Check $HOME
     # Derive full path to user's $HOME and PowerShell folders
     if ($IsWindows) {
+        # Check if running in PS Core, and adjust ChildPath for $myPSHome accordingly
+        $ChildPath = '*Documents\WindowsPowerShell'
+        if ($PSVersionTable.PSVersion.ToString() -ge '6.0') {
+            if ($PSEdition -eq 'Core') {
+                $ChildPath = '*Documents\PowerShell'
+            }
+        }
+        
         Write-Verbose -Message 'Checking if $HOME is on the Windows SystemDrive'
         # If $HOME is on the SystemDrive, then it's not the right $HOME we're looking for
         if ($Global:HOME -like "$Env:SystemDrive*") {
@@ -150,7 +154,7 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
                 # Test again
                 if (Test-Path -Path "$HomePath\*Documents") {
                     Write-Verbose -Message ('Confirmed {0} is available' -f $(Resolve-Path -Path ("$HomePath\*Documents")))
-                    $myPSHome = Join-Path -Path $HomePath -ChildPath '*Documents\WindowsPowerShell' -Resolve
+                    $myPSHome = Join-Path -Path $HomePath -ChildPath $ChildPath -Resolve
                 } else {
                     Write-Warning -Message 'Failed to find a reliable $HOME path. Consider updating $HOME and trying again.'
                     break
@@ -163,53 +167,58 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
             Write-Verbose -Message 'Testing if $HomePath is like SystemDrive'
             if ($HomePath -like "$Env:SystemDrive*") {
                 Write-Warning -Message ('Environment derived $HomePath ''{0}'' is also on SystemDrive' -f $HomePath)
-                #$myPSHome = Join-Path -Path $HomePath -ChildPath '*Documents\WindowsPowerShell' -Resolve
-                Set-Variable -Name myPSHome -Value (Join-Path -Path $HomePath -ChildPath '*Documents\WindowsPowerShell' -Resolve) -Force -Scope Global
+                Set-Variable -Name myPSHome -Value (Join-Path -Path $HomePath -ChildPath $ChildPath -Resolve) -Force -Scope Global
             } else {
                 Write-Debug -Message ('Updating $HOME to {0}.' -f $HomePath)
-                Set-Variable -Name HOME -Value (Resolve-Path $HomePath) -Force
+                Set-Variable -Name HOME -Value (Resolve-Path -Path $HomePath) -Force
                 Write-Verbose -Message (' # SUCCESS: $HOME`: {0} is now distinct from SystemDrive.' -f $HOME) 
             }
         } else {
             # $HOME is NOT on the SystemDrive, so confirm it's available
-            if (Test-Path -Path $HOME -ErrorAction Stop) {
-                #$myPSHome = Join-Path -Path $HOME -ChildPath '*Documents\WindowsPowerShell' -Resolve
-                Set-Variable -Name myPSHome -Value (Join-Path -Path $HOME -ChildPath '*Documents\WindowsPowerShell' -Resolve) -Force -Scope Global
+            if (Test-Path -Path $HOME) {
+                Set-Variable -Name myPSHome -Value (Join-Path -Path $HOME -ChildPath $ChildPath -Resolve) -Force -Scope Global
             } else {
                 write-output -InputObject ''
                 Write-Warning -Message ' FYI: Failed to access $HOME; Defaulting to $env:USERPROFILE'
                 write-output -InputObject ''
-                $myPSHome = Join-Path -Path $env:USERPROFILE -ChildPath '*Documents\WindowsPowerShell' -Resolve
-                Set-Variable -Name myPSHome -Value (Join-Path -Path $env:USERPROFILE -ChildPath '*Documents\WindowsPowerShell' -Resolve) -Force -Scope Global
+
+                Set-Variable -Name myPSHome -Value (Join-Path -Path $env:USERPROFILE -ChildPath $ChildPath -Resolve) -Force -Scope Global
                 Write-Verbose -Message ('Updating $HOME to {0}.' -f $env:USERPROFILE)
-                Set-Variable -Name HOME -Value (Resolve-Path $env:USERPROFILE) -Force
+                Set-Variable -Name HOME -Value (Resolve-Path -Path $env:USERPROFILE) -Force
             }
         }
     } else {
-        # Need to confirm / test this on non-windows OS
-        #$myPSHome = Join-Path -Path $HOME -ChildPath '.config/powershell' -Resolve
-        Set-Variable -Name myPSHome -Value (Join-Path -Path $HOME -ChildPath '.config/powershell' -Resolve) -Force -Scope Global
+        # Setup "MyPS" variables with PowerShell (pwsh) common paths for non-Windows / PS Core host
+        # https://docs.microsoft.com/en-us/powershell/scripting/whats-new/what-s-new-in-powershell-core-60
+        # The history save path is located at ~/.local/share/powershell/PSReadline/ConsoleHost_history.txt
+        # The user module path is located at ~/.local/share/powershell/Modules
+        $ChildPath = '.local/share/powershell'
+        #Set-Variable -Name myPSHome -Value (Join-Path -Path $HOME -ChildPath $ChildPath -Resolve) -Force -Scope Global
     }
+    Set-Variable -Name myPSHome -Value (Join-Path -Path $HOME -ChildPath $ChildPath -Resolve) -Force -Scope Global
 
     if (Test-Path -Path $myPSHome) {
         Write-Verbose -Message ('$myPSHome is {0}' -f $myPSHome)
         write-output -InputObject ''
-        Write-Output -InputObject "PS .\> $((Push-Location -Path $myPSHome -PassThru | Select-Object -Property Path).Path)"
+        Write-Output -InputObject ('PS .\> {0}' -f (Push-Location -Path $myPSHome -PassThru | Select-Object -Property Path).Path)
         write-output -InputObject ''
     } else {
-        throw 'Failed to establish / locate path to $HOME\*Documents\WindowsPowerShell. Resolve and reload $PROFILE'
-        break
+        Write-Warning 'Failed to establish / locate path to user PowerShell directory. Creating default locations.'
+        if (Test-Path -Path $myPSHome -IsValid) {
+            New-Item -ItemType 'directory' -Path ('{0}' -f $myPSHome)
+        } else {
+            throw 'Fatal error confirming or setting up PowerShell user root: $myPSHome'
+        }
     }
 #End Region
 
 #Region ModulePath
-    <# check and conditionally update/fix PSModulePath
-        on Mac, default PSMODULEPATH (yes, it's case sensitive) is: $env:USERPROFILE/.local/share/powershell/Modules;;/usr/local/microsoft/powershell/Modules
-    #>
-
+    # check and conditionally update/fix PSModulePath
     Write-Verbose -Message 'Checking $env:PSModulePath for user modules path ($myPSModulesPath)'
     if ($IsWindows) {
+        # In Windows, semicolon is used to separate entries in the PATH variable
         $Private:SplitChar = ';'
+
         # Use local $HOME if GPO/UNC $HOME is not available
         if (-not (Get-Variable -Name HOME)) {
             Write-Verbose -Message 'Setting $HOME to $myPSHome'
@@ -231,18 +240,16 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
         if (-not (Test-Path -Path $myPSLogPath)) {
             New-Item -Path $myPSHome -ItemType Directory -Name 'log'
         }
-
     } else {
+        # In non-Windows OS, colon character is used to separate entries in the PATH variable
         $Private:SplitChar = ':'
         if (-not (Test-Path -Path $HOME)) {
             Write-Verbose -Message 'Setting $HOME to $myPSHome'
             Set-Variable -Name HOME -Value $(Split-Path -Path $myPSHome -Parent) -Force
         }
 
-        $myPSModulesPath = (Join-Path -Path $HOME -ChildPath '.local/share/powershell/Modules') # OR /usr/local/share/powershell/Modules
-        Set-Variable -Name myPSModulesPath -Value (Join-Path -Path $HOME -ChildPath '.local/share/powershell/Modules') -Force -Scope Global
-        $myPSScriptsPath = (Join-Path -Path $HOME -ChildPath '.local/share/powershell/Scripts')
-        Set-Variable -Name myPSScriptsPath -Value (Join-Path -Path $HOME -ChildPath '.local/share/powershell/Scripts') -Force -Scope Global
+        Set-Variable -Name myPSModulesPath -Value (Join-Path -Path $myPSHome -ChildPath 'Modules') -Force -Scope Global
+        Set-Variable -Name myPSScriptsPath -Value (Join-Path -Path $myPSHome -ChildPath 'Scripts') -Force -Scope Global
     }
 
     Write-Verbose -Message ('My PS Modules Path: {0}' -f $myPSModulesPath)
@@ -250,14 +257,14 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
         Write-Debug -Message ('($myPSModulesPath -in @($Env:PSModulePath -split $Private:SplitChar) = {0}' -f ($myPSModulesPath -in @($Env:PSModulePath -split $Private:SplitChar)))
         if (($null -ne $myPSModulesPath) -and (-not ($myPSModulesPath -in @($Env:PSModulePath -split $Private:SplitChar)))) {
             Write-Verbose -Message ('Adding Modules Path: {0} to $Env:PSModulePath' -f $myPSModulesPath) -Verbose
-            $Env:PSModulePath += "$Private:SplitChar$myPSModulesPath"
+        $Env:PSModulePath += ('{0}{1}' -f $Private:SplitChar, $myPSModulesPath)
 
-            # post-update cleanup
-            if (Test-Path -Path $myPSScriptsPath) {
-                & $myPSScriptsPath\Cleanup-ModulePath.ps1
+        # post-update cleanup
+        if (Test-Path -Path (Join-Path -Path $myPSScriptsPath -ChildPath 'Cleanup-ModulePath.ps1') -ErrorAction Ignore -Path) {
+            & $myPSScriptsPath\Cleanup-ModulePath.ps1
                 Write-Output -InputObject $Env:PSModulePath
-            }
         }
+    }
 #End Region ModulePath
 
 Write-Verbose -Message 'Declaring function Get-CustomModule'

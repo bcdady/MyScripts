@@ -1,4 +1,4 @@
-#!/usr/local/bin/powershell
+#!/usr/local/bin/pwsh
 #Requires -Version 3 -module PSLogger
 #========================================
 # NAME      : Microsoft.PowerShell_profile-Windows.ps1
@@ -10,6 +10,13 @@
 [CmdletBinding()]
 param ()
 #Set-StrictMode -Version latest
+
+<#
+    # For testing: Set Verbose host output Preference
+    $VerbosePreference = 'Inquire'
+    '$IsVerbose'
+    $IsVerbose
+#>
 
 #Region MyScriptInfo
     Write-Verbose -Message '[CurrentUserCurrentHost Profile] Populating $MyScriptInfo'
@@ -68,8 +75,19 @@ param ()
 Write-Output -InputObject ' # Loading PowerShell Windows Profile Script #'
 Write-Verbose -Message (' ... from {0} # ' -f $MyScriptInfo.CommandPath)
 
+$PSDefaultParameterValues = @{
+    'Format-Table:autosize' = $true
+    'Format-Table:wrap'     = $true
+    'Get-Help:Examples'     = $true
+    'Get-Help:Online'       = $true
+    'Enter-PSSession:Credential'          = {Get-Variable -Name my2acct -ErrorAction Ignore}
+    'Enter-PSSession:EnableNetworkAccess' = $true
+    'New-PSSession:Credential'            = {Get-Variable -Name my2acct -ErrorAction Ignore}
+    'New-PSSession:EnableNetworkAccess'   = $true
+}
+
 # Define custom prompt format:
-function prompt {
+<#function prompt {
     [CmdletBinding()]
     param ()
 
@@ -82,6 +100,11 @@ function prompt {
 
     return "[{0} @ {1}]`n{2}{3}{4}{5}" -f $env:ComputerName, $pwd.Path, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel
 }
+#>
+
+# GIT_EXEC_PATH determines where Git looks for its sub-programs (like git-commit, git-diff, and others).
+#  You can check the current setting by running git --exec-path.
+$Env:GIT_EXEC_PATH = Join-Path -path $HOME -ChildPath 'Documents\WindowsPowerShell\Resources\pgit\bin\git.exe'
 
 <# Yes! This even works in XenApp!
     & Invoke-Expression (New-Object Net.WebClient).DownloadString('http://bit.ly/e0Mw9w')
@@ -146,47 +169,52 @@ Write-Debug -Message (' # # # $VerbosePreference: {0} # # #' -f $VerbosePreferen
 Write-Verbose -Message 'Checking that .\scripts\ folder is available'
 $atWork = $false
 if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType Container)) {
-  Write-Verbose -Message 'Loading scripts from .\scripts\ ...'
-  Write-Output -InputObject ''
+    Write-Verbose -Message 'Loading scripts from .\scripts\ ...'
+    Write-Output -InputObject ''
 
-  # [bool]($NetInfo.IPAddress -match "^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$") -or
-  if (Test-Connection -ComputerName $env:USERDNSDOMAIN -Quiet) {
-    $atWork = $true
-  }
-
-  Write-Verbose -Message ' ... loading NetSiteName.ps1'
-  # dot-source script file containing Get-NetSite function
-  . $myPSScriptsPath\NetSiteName.ps1
-
-    Write-Verbose -Message '     Getting $NetInfo (IPAddress, SiteName)'
-    # Get network / site info
-    $NetInfo = Get-NetSite | Select-Object -Property IPAddress, SiteName -ErrorAction Stop
-    if ($NetInfo) {
-        $SiteType = 'remote'
-        if ($atWork) {
-            $SiteType = 'work'
-        }
-        Write-Output -InputObject ("Connected at {0} site: $($NetInfo.SiteName) (Address: $($NetInfo.IPAddress))" -f $SiteType) 
-    } else {
-        Write-Warning -Message ('Failed to enumerate Network Site Info: {0}' -f $NetInfo)
-    }
+    Write-Verbose -Message ' ... loading Merge-MyPSfiles.ps1.ps1'
+    # dot-source script file containing Merge-MyPSfiles and related functions
+    . $myPSScriptsPath\Merge-MyPSFiles.ps1
 
     # dot-source script file containing Get-MyNewHelp function
     Write-Verbose -Message 'Initializing Get-MyNewHelp.ps1'
     . $myPSScriptsPath\Get-MyNewHelp.ps1
-    
-    # dot-source script file containing Citrix XenApp functions
-    Write-Verbose -Message 'Initializing Start-XenApp.ps1'
-    . $myPSScriptsPath\Start-XenApp.ps1
-    
-    Write-Verbose -Message 'Get-SystemCitrixInfo'
-    # Confirms $Global:onServer and defines/updates $Global:OnXAHost, and/or fetched Receiver version
-    Get-SystemCitrixInfo | Format-List
-    
-    # dot-source script file containing my XenApp functions
-    Write-Verbose -Message 'Initializing GBCI-XenApp.ps1'
-    . $myPSScriptsPath\GBCI-XenApp.ps1
 
+    if ($PSEdition -ne 'Core') {
+        # [bool]($NetInfo.IPAddress -match "^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$") -or
+        if (Test-Connection -ComputerName $env:USERDNSDOMAIN -Quiet) {
+            $atWork = $true
+        }
+
+        Write-Verbose -Message ' ... loading NetSiteName.ps1'
+        # dot-source script file containing Get-NetSite function
+        . $myPSScriptsPath\NetSiteName.ps1
+
+        Write-Verbose -Message '     Getting $NetInfo (IPAddress, SiteName)'
+        # Get network / site info
+        $NetInfo = Get-NetSite | Select-Object -Property IPAddress, SiteName -ErrorAction Stop
+        if ($NetInfo) {
+            $SiteType = 'remote'
+            if ($atWork) {
+                $SiteType = 'work'
+            }
+            Write-Output -InputObject ("Connected at {0} site: $($NetInfo.SiteName) (Address: $($NetInfo.IPAddress))" -f $SiteType) 
+        } else {
+            Write-Warning -Message ('Failed to enumerate Network Site Info: {0}' -f $NetInfo)
+        }
+        
+        # dot-source script file containing Citrix XenApp functions
+        Write-Verbose -Message 'Initializing Start-XenApp.ps1'
+        . $myPSScriptsPath\Start-XenApp.ps1
+        
+        Write-Verbose -Message 'Get-SystemCitrixInfo'
+        # Confirms $Global:onServer and defines/updates $Global:OnXAHost, and/or fetched Receiver version
+        Get-SystemCitrixInfo | Format-List
+        
+        # dot-source script file containing my XenApp functions
+        Write-Verbose -Message 'Initializing GBCI-XenApp.ps1'
+        . $myPSScriptsPath\GBCI-XenApp.ps1
+    }
 } else {
     Write-Warning -Message ('Failed to locate Scripts folder {0}; run any scripts.' -f $myPSScriptsPath)
 }
@@ -205,7 +233,7 @@ function Save-Credential {
     )
 
     $SaveCredential = $false
-    if ($Global:onServer) {
+    # if ($Global:onServer) {
         Write-Verbose -Message ('Starting Save-Credential $Global:onServer = {0}' -f $Global:onServer)
         $VarValueSet = [bool](Get-Variable -Name $Variable -ValueOnly -ErrorAction SilentlyContinue)
         Write-Verbose -Message ('$VarValueSet = ''{0}''' -f $VarValueSet)
@@ -234,9 +262,9 @@ function Save-Credential {
                 Write-Output -InputObject ('Elevated credentials stored in variable: {0}.' -f $Variable)
             }
         }
-    } else {
-        Write-Verbose -Message 'Skipping Save-Credential'
-    }
+    # } else {
+    #     Write-Verbose -Message 'Skipping Save-Credential'
+    # }
 } # end Save-Credential
 
 New-Alias -Name rdp -Value Start-RemoteDesktop -ErrorAction Ignore
@@ -270,7 +298,6 @@ Write-Verbose -Message ('$UpdateHelp: {0}' -f $UpdateHelp)
 
 # Try to update PS help files, if we have local admin rights
 # Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
-$IsAdmin = $false;
 if (Get-Variable -Name IsAdmin -ErrorAction Ignore) { 
     Write-Verbose -Message ('$IsAdmin: {0}' -f $IsAdmin);
 } else {
@@ -333,7 +360,6 @@ if ($atWork) {
 # Backup local PowerShell log files
 Write-Output -InputObject 'Archive PowerShell logs'
 Backup-Logs
-# Write-Output -InputObject '# Post-log backup #'
 # Write-Output -InputObject ('$VerbosePreference: {0} is {1}' -f $VerbosePreference, $IsVerbose)
 
 Write-Output -InputObject ' # End of PowerShell Windows Profile Script #'
