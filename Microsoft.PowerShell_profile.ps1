@@ -3,15 +3,25 @@
 #========================================
 # NAME      : Microsoft.PowerShell_profile.ps1
 # LANGUAGE  : Microsoft PowerShell
-# AUTHOR    : Bryan Dady
-# UPDATED   : 02/20/2018
-# COMMENT   : Originally created by New-Profile cmdlet in ProfilePal Module; modified for ps-core compatibility (use on Mac) by @bcdady 2016-09-27
+# PowerShell $Profile
+# Created by New-Profile function of ProfilePal module
+# For more information, see https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_profiles
 #========================================
 [CmdletBinding()]
 param ()
 #Set-StrictMode -Version latest
 
 <#
+    Write-Debug -Message 'Detect -Verbose $VerbosePreference'
+    switch ($VerbosePreference) {
+        Stop             { $IsVerbose = $True }
+        Inquire          { $IsVerbose = $True }
+        Continue         { $IsVerbose = $True }
+        SilentlyContinue { $IsVerbose = $False }
+        Default          { $IsVerbose = $False }
+    }
+    Write-Debug -Message ('$VerbosePreference: {0} is {1}' -f $VerbosePreference, $IsVerbose)
+
     # For testing: Set Verbose host output Preference
     $VerbosePreference = 'Inquire'
     '$IsVerbose'
@@ -76,7 +86,7 @@ Write-Output -InputObject ' # Loading PowerShell $Profile CurrentUserCurrentHost
 Write-Verbose -Message (' ... from {0} # ' -f $MyScriptInfo.CommandPath)
 
 # https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_prompts
-Write-Verbose -Message 'Declaring custom prompt'
+Write-Verbose -Message 'Defining custom prompt'
 function prompt {
     if (-not (Get-Variable -Name IsAdmin -ValueOnly -ErrorAction Ignore)) {
         $IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')
@@ -88,6 +98,7 @@ function prompt {
 
     return "[{0} @ {1}]`n{2}{3}{4}{5}" -f $Env:ComputerName, $pwd.Path, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel
 }
+
 #Region Bootstrap
     # Moved HOME / MyPSHome, Modules, and Scripts variable determination to bootstrap script
     Write-Verbose -Message '(Get-Variable -Name "myPSHome" -ErrorAction Ignore)'
@@ -118,11 +129,15 @@ function prompt {
     }
 #End Region  
 
+<# Yes! This even works in XenApp!
+    & Invoke-Expression (New-Object Net.WebClient).DownloadString('http://bit.ly/e0Mw9w')
+    # start-sleep -Seconds 3
+#>
 # Call Set-ConsoleTitle, from ProfilePal module
 Set-ConsoleTitle
 
 # Display execution policy, for convenience
-Write-Output -InputObject 'Current PS execution policy is:'
+Write-Output -InputObject 'PowerShell Execution Policy: '
 Get-ExecutionPolicy -List | Format-Table -AutoSize
 
 # Detect host OS and then jump to the OS specific profile sub-script

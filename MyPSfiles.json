@@ -1,0 +1,97 @@
+{
+    "about": {
+            "author": "@bcdady",
+            "name": "MyPSfiles.json",
+            "description": "Define preference and configurations (in JSON language) for Merge-MyPSfiles.ps1.",
+            "type": "JSON",
+            "notes" : "Add repositories to sync between PowerShell Core and Windows PowerShell file paths",
+            "program": "PowerShell: Merge-Module.ps1",
+            "updated": "02-26-2018",
+            "version": "1.0.2"
+        },
+    "DiffTool": {
+        "Name": "WinMerge",
+        "Path": "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\ISESteroids\\3rdParty\\WinMerge\\App\\WinMerge\\WinMergeU.exe",
+        "Help_URL": "http://manual.winmerge.org/Command_line.html",
+        "Options": "/e /xq"
+    },
+    "RepositorySets" : [
+        {
+            "Name": "my_scripts",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Scripts",
+            "TargetPath" : "H:\\My Documents\\WindowsPowerShell\\Scripts",
+            "MergePath"  : "",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "core_scripts",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Scripts",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\PowerShell\\Scripts",
+            "MergePath"  : "",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "gh_scripts",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Scripts",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\GitHub\\MyScripts",
+            "MergePath"  : "",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "my_CHprofile",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Microsoft.PowerShell_profile.ps1",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\PowerShell\\Microsoft.PowerShell_profile.ps1",
+            "MergePath"  : "H:\\My Documents\\WindowsPowerShell\\Microsoft.PowerShell_profile.ps1",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "gh_CHprofile",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Microsoft.PowerShell_profile.ps1",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\GitHub\\MyScripts\\Microsoft.PowerShell_profile.ps1",
+            "MergePath"  : "",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "R_Edit-Module",
+            "SourcePath" : "H:\\My Documents\\WindowsPowerShell\\Modules\\Edit-Module",
+            "TargetPath" : "R:\\IT\\PowerShell-Modules\\Edit-Module",
+            "MergePath"  : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\Edit-Module",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "gh_Edit-Module",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\Edit-Module",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\PowerShell\\Modules\\Edit-Module",
+            "MergePath"  : "$env:USERPROFILE\\Documents\\GitHub\\Edit-Module",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "R_ProfilePal",
+            "SourcePath" : "H:\\My Documents\\WindowsPowerShell\\Modules\\ProfilePal",
+            "TargetPath" : "R:\\IT\\PowerShell-Modules\\ProfilePal",
+            "MergePath"  : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\ProfilePal",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "gh_ProfilePal",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\ProfilePal",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\PowerShell\\Modules\\ProfilePal",
+            "MergePath"  : "$env:USERPROFILE\\Documents\\GitHub\\ProfilePal",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "R_PSLogger",
+            "SourcePath" : "H:\\My Documents\\WindowsPowerShell\\Modules\\PSLogger",
+            "TargetPath" : "R:\\IT\\PowerShell-Modules\\PSLogger",
+            "MergePath"  : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\PSLogger",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "gh_PSLogger",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\PSLogger",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\PowerShell\\Modules\\PSLogger",
+            "MergePath"  : "$env:USERPROFILE\\Documents\\GitHub\\PSLogger",
+            "OptionsOverride" : ""
+        }
+    ]
+}

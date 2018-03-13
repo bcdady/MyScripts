@@ -254,15 +254,15 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
 
     Write-Verbose -Message ('My PS Modules Path: {0}' -f $myPSModulesPath)
 
-        Write-Debug -Message ('($myPSModulesPath -in @($Env:PSModulePath -split $Private:SplitChar) = {0}' -f ($myPSModulesPath -in @($Env:PSModulePath -split $Private:SplitChar)))
-        if (($null -ne $myPSModulesPath) -and (-not ($myPSModulesPath -in @($Env:PSModulePath -split $Private:SplitChar)))) {
-            Write-Verbose -Message ('Adding Modules Path: {0} to $Env:PSModulePath' -f $myPSModulesPath) -Verbose
+    Write-Debug -Message ('($myPSModulesPath -in @($Env:PSModulePath -split $Private:SplitChar) = {0}' -f ($myPSModulesPath -in @($Env:PSModulePath -split $Private:SplitChar)))
+    if (($null -ne $myPSModulesPath) -and (-not ($myPSModulesPath -in @($Env:PSModulePath -split $Private:SplitChar)))) {
+        Write-Verbose -Message ('Adding Modules Path: {0} to $Env:PSModulePath' -f $myPSModulesPath) -Verbose
         $Env:PSModulePath += ('{0}{1}' -f $Private:SplitChar, $myPSModulesPath)
 
         # post-update cleanup
-        if (Test-Path -Path (Join-Path -Path $myPSScriptsPath -ChildPath 'Cleanup-ModulePath.ps1') -ErrorAction Ignore -Path) {
+        if (Test-Path -Path (Join-Path -Path $myPSScriptsPath -ChildPath 'Cleanup-ModulePath.ps1') -ErrorAction Ignore) {
             & $myPSScriptsPath\Cleanup-ModulePath.ps1
-                Write-Output -InputObject $Env:PSModulePath
+            Write-Output -InputObject $Env:PSModulePath
         }
     }
 #End Region ModulePath

@@ -94,9 +94,11 @@ New-Variable -Name MySettingsFile -Description 'Path to Merge-MyPSFiles settings
 New-Variable -Name MyMergeSettings -Description ('Settings, from {0}' -f $Local:MySettingsFile) -Scope Local -Option AllScope -Force
 New-Variable -Name MergeEnvironmentSet -Description 'Boolean indicating custom environmental variables are loaded / available' -Value $false -Scope Local -Option AllScope -Force
 
-# $Private:CompareDirectory = Join-Path -Path $(Split-Path -Path $PSCommandPath -Parent) -ChildPath 'Compare-Directory.ps1' -ErrorAction Stop
-# Write-Verbose -Message (' Dot-Sourcing {0}' -f $Private:CompareDirectory)
-# . $Private:CompareDirectory
+<#
+    $Private:CompareDirectory = Join-Path -Path $(Split-Path -Path $PSCommandPath -Parent) -ChildPath 'Compare-Directory.ps1' -ErrorAction Stop
+    Write-Verbose -Message (' Dot-Sourcing {0}' -f $Private:CompareDirectory)
+    . $Private:CompareDirectory
+#>
 
 # Get Merge-MyPSFiles config from Merge-MyPSFiles.json
 Write-Verbose -Message 'Declaring Function Import-MyMergeSettings'
@@ -188,7 +190,6 @@ function Get-Environment {
     if (Test-Path -Path $env:HOMEDRIVE) {
       $netPSHome = (Join-Path -Path $env:HOMEDRIVE -ChildPath '*\WindowsPowerShell' -Resolve)
       Write-Verbose -Message ('Set $netPSHome to {0}' -f $netPSHome)
-      #$netPSHome = Join-Path -Path $env:HOMEDRIVE -ChildPath '*\WindowsPowerShell' -Resolve
       Set-Variable -Name netPSHome -Value $netPSHome -Scope Local
     } else {
       Write-Warning -Message 'Test-Path -Path $env:HOMEDRIVE: $false'
@@ -264,13 +265,13 @@ function Merge-MyPSFiles {
                 #Mount-Path
                 # Re-Test availability of TargetPath, and if still missing, halt
                 if (Test-Path -Path (Split-Path -Path $TargetPath -Parent)) {
-                Write-Verbose -Message ('Confirmed TargetPath (parent): {0} is available.' -f (Split-Path -Path ($TargetPath) -Parent))
-                $Private:GoodToGo = $true
-                } else {
-                # Invoke Mount-Path function, from Sperry module, to map all user's drives
-                Write-Warning -Message 'TargetPath (parent) is still NOT available.'
-                }
-            #>
+	                Write-Verbose -Message ('Confirmed TargetPath (parent): {0} is available.' -f (Split-Path -Path ($TargetPath) -Parent))
+	                $Private:GoodToGo = $true
+	            } else {
+	                # Invoke Mount-Path function, from Sperry module, to map all user's drives
+	                Write-Warning -Message 'TargetPath (parent) is still NOT available.'
+	            }
+			#>
         }
 
         if ($Private:GoodSource -and $Private:GoodTarget) {
@@ -288,7 +289,8 @@ function Merge-MyPSFiles {
             } # end if Compare-Directory
         } else {
             Write-Output -InputObject ''
-            Write-Warning -Message 'Fatal error validating source Path and target Destination'
+            Write-Warning -Message 'Fatal Error validating source Path and target Destination'
+            Write-Verbose -Message ('$Private:GoodSource: {0} // $Private:GoodTarget: {1}' -f $Private:GoodSource, $Private:GoodTarget)
         }
         Write-Output -InputObject ''
     }
