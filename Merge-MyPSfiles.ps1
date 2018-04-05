@@ -70,28 +70,22 @@ Set-StrictMode -Version latest
   if (Get-Variable -Name $PSItem -Scope Private -ErrorAction Ignore) {
     Write-Verbose -Message ('Remove-Variable $Private:{0}' -f $PSItem)
     Remove-Variable -Name $PSItem -Scope Private
-  } else {
-    Write-Verbose -Message ('Variable $Private:{0} not found.' -f $PSItem)
   }
   # Cleanup any Local Scope residue
   if (Get-Variable -Name $PSItem -Scope Local -ErrorAction Ignore) {
     Write-Verbose -Message ('Remove-Variable $Local:{0}' -f $PSItem)
     Remove-Variable -Name $PSItem -Scope Local
-  } else {
-    Write-Verbose -Message ('Variable $Local:{0} not found.' -f $PSItem)
   }
   # Cleanup any Script Scope residue
   if (Get-Variable -Name $PSItem -Scope Script -ErrorAction Ignore) {
     Write-Verbose -Message ('Remove-Variable $Script:{0}' -f $PSItem)
     Remove-Variable -Name $PSItem -Scope Script
-  } else {
-    Write-Verbose -Message ('Variable $Script:{0} not found.' -f $PSItem)
   }
 } # End Clean Up
 
 # Declare shared variables, to be available across/between functions
 New-Variable -Name MySettingsFile -Description 'Path to Merge-MyPSFiles settings file' -Value 'MyPSfiles.json' -Scope Local -Option AllScope -Force
-New-Variable -Name MyMergeSettings -Description ('Settings, from {0}' -f $Local:MySettingsFile) -Scope Local -Option AllScope -Force
+New-Variable -Name MyMergeSettings -Description ('Settings, from {0}' -f $MySettingsFile) -Scope Local -Option AllScope -Force
 New-Variable -Name MergeEnvironmentSet -Description 'Boolean indicating custom environmental variables are loaded / available' -Value $false -Scope Local -Option AllScope -Force
 
 <#
@@ -123,9 +117,9 @@ Function Import-MyMergeSettings {
         get-variable -scope Private
     #>
     
-    Write-Debug -Message ('$DSPath = Join-Path -Path {0} -ChildPath {1}' -f (Split-Path -Path $PSCommandPath -Parent), $Local:MySettingsFile)
+    Write-Debug -Message ('$DSPath = Join-Path -Path {0} -ChildPath {1}' -f (Split-Path -Path $PSCommandPath -Parent), $MySettingsFile)
 
-    $DSPath = Join-Path -Path $(Split-Path -Path $PSCommandPath -Parent) -ChildPath $Local:MySettingsFile
+    $DSPath = Join-Path -Path $(Split-Path -Path $PSCommandPath -Parent) -ChildPath $MySettingsFile
     Write-Debug -Message ('$MyMergeSettings = (Get-Content -Path {0} ) -join "`n" | ConvertFrom-Json' -f $DSPath)
 
     #try {
@@ -209,7 +203,7 @@ function Merge-MyPSFiles {
     if ($MyMergeSettings -and ($MyMergeSettings.imported)) {
         Write-Verbose -Message ('{0} already instantiated.' -f $MyMergeSettings)
     } else {
-        Write-Verbose -Message ('Read configs from {0} to $MyMergeSettings' -f $Local:MySettingsFile)
+        Write-Verbose -Message ('Read configs from {0} to $MyMergeSettings' -f $MySettingsFile)
         Import-MyMergeSettings
     }
 
@@ -309,7 +303,7 @@ function Merge-Modules {
   param()
 
   if (-not [bool](Get-Variable -Name MyMergeSettings -ErrorAction Ignore)) {
-    Write-Verbose -Message ('Reading configs from {0}' -f $Local:MySettingsFile)
+    Write-Verbose -Message ('Reading configs from {0}' -f $MySettingsFile)
     Import-MyMergeSettings
   }
 

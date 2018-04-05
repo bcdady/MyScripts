@@ -119,6 +119,7 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
     $env:HostOS = $hostOS
 
     $Global:onServer = $false
+    $Global:onXAHost = $false
     if ($hostOSCaption -like '*Windows Server*') {
         $Global:onServer = $true
     }
@@ -127,88 +128,88 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
 #Region Check $HOME
     # Derive full path to user's $HOME and PowerShell folders
     if ($IsWindows) {
-        # Check if running in PS Core, and adjust ChildPath for $myPSHome accordingly
-        $ChildPath = '*Documents\WindowsPowerShell'
-        if ($PSVersionTable.PSVersion.ToString() -ge '6.0') {
-            if ($PSEdition -eq 'Core') {
-                $ChildPath = '*Documents\PowerShell'
-            }
-        }
-        
         Write-Verbose -Message 'Checking if $HOME is on the Windows SystemDrive'
         # If $HOME is on the SystemDrive, then it's not the right $HOME we're looking for
+        if (-not (Test-Path -Path $Global:HOME)) {
+            # $HOME is NOT set or available, so set it to match $env:USERPROFILE
+            Write-Output  -InputObject ''
+            Write-Warning -Message ' FYI: Failed to access $HOME; Defaulting to $env:USERPROFILE'
+            Write-Output  -InputObject ''
+
+            Write-Verbose -Message ('Updating $HOME to {0}.' -f $env:USERPROFILE)
+            Set-Variable  -Name HOME -Value (Resolve-Path -Path $env:USERPROFILE) -Force
+        }
+
+        # First, Prefer non-local $HOME if/when possible
         if ($Global:HOME -like "$Env:SystemDrive*") {
             Write-Warning -Message ('$HOME ''{0}'' is on SystemDrive. Looking for another possible HOME path' -f $HOME)
-            # Try to figure out where the non-local-system $HOME is
-            if (Test-Path -Path "$Env:HOMEDRIVE$Env:HOMEPATH") {
+            # Detect / derive a viable (new) $HOME root, by looking at the HOMEDRIVE, HOMEPATH system variables
+            if (Test-Path -Path ('{0}{1}' -f $Env:HOMEDRIVE, $Env:HOMEPATH)) {
                 $HomePath = Join-Path -Path $Env:HOMEDRIVE -ChildPath $Env:HOMEPATH -Resolve
 
-                if (Test-Path -Path "$HomePath\*Documents") {
-                    $HomePath = Join-Path -Path $Env:HOMEDRIVE -ChildPath $Env:HOMEPATH -Resolve
-                    Write-Verbose -Message ('Confirmed {0} is available' -f $(Resolve-Path -Path ("$HomePath\*Documents")))
+                if (Test-Path -Path (Join-Path -Path $HomePath -ChildPath '*Documents')) {
+                    Write-Verbose -Message ('Confirmed {0} has a [My ]Documents subfolder' -f $HomePath)
                 } else {
-                    Write-Verbose -Message ('$HomePath ''{0}'' does not appear to contain a [My ]Documents folder, so it''s not obviously a usable {1} path. Trying H:\' -f $HomePath, $HOME)
+                    Write-Verbose -Message ('$HomePath ''{0}'' does not appear to contain a [My ]Documents folder, so it''s not a reliable $HOME path. Trying H:\' -f $HomePath)
                     $HomePath = 'H:'
                 }
-
-                # Test again
-                if (Test-Path -Path "$HomePath\*Documents") {
-                    Write-Verbose -Message ('Confirmed {0} is available' -f $(Resolve-Path -Path ("$HomePath\*Documents")))
-                    $myPSHome = Join-Path -Path $HomePath -ChildPath $ChildPath -Resolve
-                } else {
-                    Write-Warning -Message 'Failed to find a reliable $HOME path. Consider updating $HOME and trying again.'
-                    break
+                # Update $HOME to match $HomePath
+                if ($HomePath -ne $HOME) {
+                    Write-Debug -Message ('Updating $HOME to {0}.' -f $HomePath)
+                    Set-Variable -Name HOME -Value (Resolve-Path -Path $HomePath) -Force
+                    Write-Verbose -Message (' # SUCCESS: $HOME`: {0} is now distinct from SystemDrive.' -f $HOME) 
                 }
             } else {
                 Write-Verbose -Message ('Determined {0} ($Env:HOMEDRIVE+$Env:HOMEPATH) is NOT available' -f ("$Env:HOMEDRIVE$Env:HOMEPATH"))
                 $HomePath = $HOME
             }
-
-            Write-Verbose -Message 'Testing if $HomePath is like SystemDrive'
-            if ($HomePath -like "$Env:SystemDrive*") {
-                Write-Warning -Message ('Environment derived $HomePath ''{0}'' is also on SystemDrive' -f $HomePath)
-                Set-Variable -Name myPSHome -Value (Join-Path -Path $HomePath -ChildPath $ChildPath -Resolve) -Force -Scope Global
-            } else {
-                Write-Debug -Message ('Updating $HOME to {0}.' -f $HomePath)
-                Set-Variable -Name HOME -Value (Resolve-Path -Path $HomePath) -Force
-                Write-Verbose -Message (' # SUCCESS: $HOME`: {0} is now distinct from SystemDrive.' -f $HOME) 
-            }
         } else {
-            # $HOME is NOT on the SystemDrive, so confirm it's available
-            if (Test-Path -Path $HOME) {
-                Set-Variable -Name myPSHome -Value (Join-Path -Path $HOME -ChildPath $ChildPath -Resolve) -Force -Scope Global
-            } else {
-                write-output -InputObject ''
-                Write-Warning -Message ' FYI: Failed to access $HOME; Defaulting to $env:USERPROFILE'
-                write-output -InputObject ''
+            Write-Verbose -Message ('Confirmed $HOME`: {0} is distinct from SystemDrive.' -f $HOME)
+            $HomePath = $HOME
+        }
 
-                Set-Variable -Name myPSHome -Value (Join-Path -Path $env:USERPROFILE -ChildPath $ChildPath -Resolve) -Force -Scope Global
-                Write-Verbose -Message ('Updating $HOME to {0}.' -f $env:USERPROFILE)
-                Set-Variable -Name HOME -Value (Resolve-Path -Path $env:USERPROFILE) -Force
-            }
+        # Next, confirm a viable [My ]Documents subfolder, and update the $myPSHome variable for later re-use/reference
+        if (Test-Path -Path (Join-Path -Path $HomePath -ChildPath '*Documents' -Resolve)) {
+            Write-Verbose -Message ('Confirmed {0} has a [My ]Documents subfolder' -f $HomePath)
+        } else {
+            Write-Warning -Message 'Failed to find a reliable $HOME path. Consider updating $HOME and trying again.'
+            break
+        }
+
+        # Finally, adjust [My ]Documents ChildPath for PS Core or PS Desktop, ONLY if/when running locally
+        $MyDocs = (Join-Path -Path $HOME -ChildPath '*Documents' -Resolve)
+        $myPSHome = ('{0}\WindowsPowerShell' -f $MyDocs)
+        if (($Global:HOME -like "$Env:SystemDrive*") -and ($PSEdition -eq 'Core')) {
+            Write-Verbose -Message 'Using local PS Core path: ''PowerShell''.' -Verbose
+            $myPSHome = ('{0}\PowerShell' -f $MyDocs)
         }
     } else {
         # Setup "MyPS" variables with PowerShell (pwsh) common paths for non-Windows / PS Core host
         # https://docs.microsoft.com/en-us/powershell/scripting/whats-new/what-s-new-in-powershell-core-60
         # The history save path is located at ~/.local/share/powershell/PSReadline/ConsoleHost_history.txt
         # The user module path is located at ~/.local/share/powershell/Modules
-        $ChildPath = '.local/share/powershell'
+        $myPSHome = ('{0}.local/share/powershell' -f '~')
         #Set-Variable -Name myPSHome -Value (Join-Path -Path $HOME -ChildPath $ChildPath -Resolve) -Force -Scope Global
     }
-    Set-Variable -Name myPSHome -Value (Join-Path -Path $HOME -ChildPath $ChildPath -Resolve) -Force -Scope Global
 
-    if (Test-Path -Path $myPSHome) {
-        Write-Verbose -Message ('$myPSHome is {0}' -f $myPSHome)
-        write-output -InputObject ''
-        Write-Output -InputObject ('PS .\> {0}' -f (Push-Location -Path $myPSHome -PassThru | Select-Object -Property Path).Path)
-        write-output -InputObject ''
-    } else {
-        Write-Warning 'Failed to establish / locate path to user PowerShell directory. Creating default locations.'
-        if (Test-Path -Path $myPSHome -IsValid) {
-            New-Item -ItemType 'directory' -Path ('{0}' -f $myPSHome)
+    Set-Variable -Name myPSHome -Value $myPSHome -Force -Scope Global
+
+    if (Get-Variable -Name myPSHome) {
+        if (Test-Path -Path $GLOBAL:myPSHome -ErrorAction Ignore) {
+            Write-Verbose -Message ('$myPSHome is {0}' -f $myPSHome)
+            write-output -InputObject ''
+            Write-Output -InputObject ('PS .\> {0}' -f (Push-Location -Path $myPSHome -PassThru | Select-Object -Property Path).Path)
+            write-output -InputObject ''
         } else {
-            throw 'Fatal error confirming or setting up PowerShell user root: $myPSHome'
+            Write-Warning 'Failed to establish / locate path to user PowerShell directory. Creating default locations.'
+            if (Test-Path -Path $myPSHome -IsValid -ErrorAction Stop) {
+                New-Item -ItemType 'directory' -Path ('{0}' -f $myPSHome)
+            } else {
+                throw 'Fatal error confirming or setting up PowerShell user root: $myPSHome'
+            }
         }
+    } else {
+        throw 'Fatal error: $myPSHome is empty or null'
     }
 #End Region
 
@@ -269,7 +270,7 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
 
 Write-Verbose -Message 'Declaring function Get-CustomModule'
 function Get-CustomModule {
-    return Get-Module -ListAvailable | Where-Object -FilterScript {$PSItem.ModuleType -eq 'Script' -and $PSItem.Author -notlike 'Microsoft Corporation'}
+    return Get-Module -ListAvailable | Where-Object -FilterScript {$PSItem.ModuleType -eq 'Script' -and $PSItem.Author -NotLike 'Microsoft Corporation'}
 }
 
 write-output -InputObject ''

@@ -13,7 +13,7 @@
         "Name": "WinMerge",
         "Path": "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\ISESteroids\\3rdParty\\WinMerge\\App\\WinMerge\\WinMergeU.exe",
         "Help_URL": "http://manual.winmerge.org/Command_line.html",
-        "Options": "/e /xq"
+        "Options": "/e /xq /f *.json;*.ps*1;*.txt"
     },
     "RepositorySets" : [
         {
@@ -91,6 +91,13 @@
             "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\PSLogger",
             "TargetPath" : "$env:USERPROFILE\\Documents\\PowerShell\\Modules\\PSLogger",
             "MergePath"  : "$env:USERPROFILE\\Documents\\GitHub\\PSLogger",
+            "OptionsOverride" : ""
+        },
+        {
+            "Name": "gh_Sperry",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\Sperry",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\GitHub\\PSLogger",
+            "MergePath"  : "",
             "OptionsOverride" : ""
         }
     ]
