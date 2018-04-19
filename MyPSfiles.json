@@ -9,9 +9,9 @@
             "updated": "02-26-2018",
             "version": "1.0.2"
         },
-    "DiffTool": {
+    "MergeTool": {
         "Name": "WinMerge",
-        "Path": "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\ISESteroids\\3rdParty\\WinMerge\\App\\WinMerge\\WinMergeU.exe",
+        "Path": "$myPSModulesPath\\ISESteroids\\3rdParty\\WinMerge\\App\\WinMerge\\WinMergeU.exe",
         "Help_URL": "http://manual.winmerge.org/Command_line.html",
         "Options": "/e /xq /f *.json;*.ps*1;*.txt"
     },

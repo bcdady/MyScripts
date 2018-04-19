@@ -76,7 +76,7 @@ Write-Output -InputObject ' # Loading PowerShell Windows Profile Script #'
 Write-Verbose -Message (' ... from {0} # ' -f $MyScriptInfo.CommandPath)
 
 $PSDefaultParameterValues = @{
-    'Format-Table:autosize' = $true
+    'Format-Table:Autosize' = $true
     'Format-Table:wrap'     = $true
     'Get-Help:Examples'     = $true
     'Get-Help:Online'       = $true
@@ -86,26 +86,14 @@ $PSDefaultParameterValues = @{
     'New-PSSession:EnableNetworkAccess'   = $true
 }
 
-# Define custom prompt format:
-<#function prompt {
-    [CmdletBinding()]
-    param ()
-
-    $IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')
-    if($IsAdmin) {$AdminPrompt = '[ADMIN]:'} else {$AdminPrompt = ''}
-    if(Get-Variable -Name PSDebugContext -ValueOnly -ErrorAction Ignore) {$DebugPrompt = '[DEBUG]:'} else {$DebugPrompt = ''}
-    if(Get-Variable -Name PSConsoleFile -ValueOnly -ErrorAction Ignore)  {$PSCPrompt = "[PSConsoleFile: $PSConsoleFile]"} else {$PSCPrompt = ''}
-
-    if($NestedPromptLevel -ge 1){ $PromptLevel = 'PS .\> >' } else { $PromptLevel = 'PS .\>'}
-
-    return "[{0} @ {1}]`n{2}{3}{4}{5}" -f $env:ComputerName, $pwd.Path, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel
-}
-#>
-
+Write-Verbose -Message 'Setting GIT_EXEC_PATH'
 # GIT_EXEC_PATH determines where Git looks for its sub-programs (like git-commit, git-diff, and others).
 #  You can check the current setting by running git --exec-path.
-$Env:GIT_EXEC_PATH = Join-Path -path $HOME -ChildPath 'Documents\WindowsPowerShell\Resources\pgit\bin\git.exe'
-
+if ($onServer) {
+    $Env:GIT_EXEC_PATH = Get-Item -Path 'R:\IT\Microsoft Tools\VSCode\GitPortable\bin'
+} else {
+    $Env:GIT_EXEC_PATH = Join-Path -Path $Env:USERPROFILE -ChildPath 'Documents\WindowsPowerShell\Resources\pgit\bin\git.exe'
+}
 <# Yes! This even works in XenApp!
     & Invoke-Expression (New-Object Net.WebClient).DownloadString('http://bit.ly/e0Mw9w')
     # start-sleep -Seconds 3
@@ -172,49 +160,53 @@ if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType
     Write-Verbose -Message 'Loading scripts from .\scripts\ ...'
     Write-Output -InputObject ''
 
-    Write-Verbose -Message ' ... loading Merge-MyPSfiles.ps1.ps1'
-    # dot-source script file containing Merge-MyPSfiles and related functions
+    Write-Verbose -Message ' ... loading Merge-MyPSFiles.ps1'
+    # dot-source script file containing Merge-MyPSFiles and related functions
     . $myPSScriptsPath\Merge-MyPSFiles.ps1
 
     # dot-source script file containing Get-MyNewHelp function
     Write-Verbose -Message 'Initializing Get-MyNewHelp.ps1'
     . $myPSScriptsPath\Get-MyNewHelp.ps1
 
-    if ($PSEdition -ne 'Core') {
-        # [bool]($NetInfo.IPAddress -match "^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$") -or
-        if (Test-Connection -ComputerName $env:USERDNSDOMAIN -Quiet) {
-            $atWork = $true
-        }
-
-        Write-Verbose -Message ' ... loading NetSiteName.ps1'
-        # dot-source script file containing Get-NetSite function
-        . $myPSScriptsPath\NetSiteName.ps1
-
-        Write-Verbose -Message '     Getting $NetInfo (IPAddress, SiteName)'
-        # Get network / site info
-        $NetInfo = Get-NetSite | Select-Object -Property IPAddress, SiteName -ErrorAction Stop
-        if ($NetInfo) {
-            $SiteType = 'remote'
-            if ($atWork) {
-                $SiteType = 'work'
-            }
-            Write-Output -InputObject ("Connected at {0} site: $($NetInfo.SiteName) (Address: $($NetInfo.IPAddress))" -f $SiteType) 
-        } else {
-            Write-Warning -Message ('Failed to enumerate Network Site Info: {0}' -f $NetInfo)
-        }
-        
-        # dot-source script file containing Citrix XenApp functions
-        Write-Verbose -Message 'Initializing Start-XenApp.ps1'
-        . $myPSScriptsPath\Start-XenApp.ps1
-        
-        Write-Verbose -Message 'Get-SystemCitrixInfo'
-        # Confirms $Global:onServer and defines/updates $Global:OnXAHost, and/or fetched Receiver version
-        Get-SystemCitrixInfo | Format-List
-        
-        # dot-source script file containing my XenApp functions
-        Write-Verbose -Message 'Initializing GBCI-XenApp.ps1'
-        . $myPSScriptsPath\GBCI-XenApp.ps1
+    Write-Verbose -Message 'Test network availability of work domain'
+    $atWork = $False
+    # [bool]($NetInfo.IPAddress -match "^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$") -or
+    # Test-Connection is not supported in PS Core 6, so replaced with custom Test-Port function
+    # Test-Port -Target $env:USERDNSDOMAIN -Port 445 | Format-List -Property ConnectionStatus, PortNumber, TargetHostName, TargetHostStatus
+    # $ConnectionStatus = Test-Port -Target $env:USERDNSDOMAIN -Port 445 | Format-List -Property ConnectionStatus, PortNumber, TargetHostName, TargetHostStatus
+    Get-Command -Name Test-Port
+    if ((Test-Port -Target $env:USERDNSDOMAIN -Port 445).ConnectionStatus = 'Success') {
+        $atWork = $True
     }
+
+    Write-Verbose -Message ' ... loading NetSiteName.ps1'
+    # dot-source script file containing Get-NetSite function
+    . $myPSScriptsPath\NetSiteName.ps1
+
+    Write-Verbose -Message '     Getting $NetInfo (IPAddress, SiteName)'
+    # Get network / site info
+    $NetInfo = Get-NetSite | Select-Object -Property IPAddress, SiteName -ErrorAction Stop
+    if ($NetInfo) {
+        $SiteType = 'Remote'
+        if ($atWork) {
+            $SiteType = 'Work'
+        }
+        Write-Output -InputObject ("Connected at {0} site: $($NetInfo.SiteName) (Address: $($NetInfo.IPAddress))" -f $SiteType) 
+    } else {
+        Write-Warning -Message ('Failed to enumerate Network Site Info: {0}' -f $NetInfo)
+    }
+    
+    # dot-source script file containing Citrix XenApp functions
+    Write-Verbose -Message 'Initializing Start-XenApp.ps1'
+    . $myPSScriptsPath\Start-XenApp.ps1
+    
+    Write-Verbose -Message 'Get-SystemCitrixInfo'
+    # Confirms $Global:onServer and defines/updates $Global:OnXAHost, and/or fetched Receiver version
+    Get-SystemCitrixInfo | Format-List
+    
+    # dot-source script file containing my XenApp functions
+    Write-Verbose -Message 'Initializing GBCI-XenApp.ps1'
+    . $myPSScriptsPath\GBCI-XenApp.ps1
 } else {
     Write-Warning -Message ('Failed to locate Scripts folder {0}; run any scripts.' -f $myPSScriptsPath)
 }
