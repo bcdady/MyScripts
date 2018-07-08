@@ -1,5 +1,5 @@
 #!/usr/local/bin/pwsh
-#Requires -Version 3 -module PSLogger
+#Requires -Version 3 -module PSLogger, Edit-Module
 #========================================
 # NAME      : Microsoft.PowerShell_profile-Windows.ps1
 # LANGUAGE  : Windows PowerShell
@@ -11,12 +11,9 @@
 param ()
 #Set-StrictMode -Version latest
 
-<#
-    # For testing: Set Verbose host output Preference
-    $VerbosePreference = 'Inquire'
-    '$IsVerbose'
-    $IsVerbose
-#>
+# Uncomment the following 2 lines for testing profile scripts with Verbose output
+#'$VerbosePreference = ''Continue'''
+#$VerbosePreference = 'Continue'
 
 #Region MyScriptInfo
     Write-Verbose -Message '[CurrentUserCurrentHost Profile] Populating $MyScriptInfo'
@@ -86,7 +83,7 @@ $PSDefaultParameterValues = @{
     'New-PSSession:EnableNetworkAccess'   = $true
 }
 
-Write-Verbose -Message 'Setting GIT_EXEC_PATH'
+Write-Verbose -Message ' # Setting GIT_EXEC_PATH #'
 # GIT_EXEC_PATH determines where Git looks for its sub-programs (like git-commit, git-diff, and others).
 #  You can check the current setting by running git --exec-path.
 if ($onServer) {
@@ -101,21 +98,30 @@ if ($onServer) {
 
 # Write-Debug -Message (' # # # $VerbosePreference: {0} # # #' -f $VerbosePreference)
 
-Write-Verbose -Message 'Declaring function Invoke-WinSleep'
+Write-Verbose -Message 'Declaring function Show-DesktopDocuments'
+function Show-DesktopDocuments {
+    Write-Log -Message 'Opening all Desktop Documents' -Function $MyInvocation.MyCommand.Name
+    # Open all desktop PDF files
+    Get-ChildItem -Path $env:USERPROFILE\Desktop\*.pdf | ForEach-Object { & $_ ; Start-Sleep -Milliseconds 400}
+    # Open all desktop Word doc files
+    Get-ChildItem -Path $env:USERPROFILE\Desktop\*.doc* | ForEach-Object { & $_ ; Start-Sleep -Milliseconds 800}
+} # end function Show-DesktopDocuments
+
+Write-Verbose -Message ' # Declaring function Invoke-WinSleep #'
 function Invoke-WinSleep {
-  if ($onServer) {
-    Write-Verbose -Message 'Invoke-WinSleep function is not for Server'
-  } else {
-    Write-Warning -Message 'Sleeping Windows in 30 seconds'
-    'Enter Ctrl+C to abort'
-    Start-Sleep -Seconds 30
-    & "$env:windir\system32\rundll32.exe" powrprof.dll, SetSuspendState Sleep
-  }
+    # Write-Verbose -Message 'Invoke-WinSleep function is not for Server'
+    if (-not $onServer) {
+        Write-Warning -Message 'Sleeping Windows in 30 seconds'
+        'Enter Ctrl+C to abort'
+        Write-Verbose -Message 'rundll32.exe" powrprof.dll, SetSuspendState Sleep'
+        Start-Sleep -Seconds 30
+        & "$env:windir\system32\rundll32.exe" powrprof.dll, SetSuspendState Sleep
+    }
 }
 New-Alias -Name GoTo-Sleep -Value Invoke-WinSleep -ErrorAction Ignore
 New-Alias -Name Sleep-PC -Value Invoke-WinSleep -ErrorAction Ignore
 
-Write-Verbose -Message 'Declaring function Invoke-WinShutdown'
+Write-Verbose -Message ' # Declaring function Invoke-WinShutdown #'
 function Invoke-WinShutdown {
   if ($onServer) {
       Write-Verbose -Message 'Invoke-WinShutdown function is not for Server'
@@ -128,7 +134,7 @@ function Invoke-WinShutdown {
 New-Alias -Name Shutdown -Value Invoke-WinShutdown -ErrorAction Ignore
 New-Alias -Name Shutdown-PC -Value Invoke-WinShutdown -ErrorAction Ignore
 
-Write-Verbose -Message 'Declaring function Invoke-WinRestart'
+Write-Verbose -Message ' # Declaring function Invoke-WinRestart #'
 function Invoke-WinRestart {
   if ($onServer) {
       Write-Verbose -Message 'Invoke-WinShutdown function is not for Server'
@@ -144,7 +150,7 @@ New-Alias -Name Restart -Value Invoke-WinRestart -ErrorAction Ignore
 if (-not $onServer) {
   # 'Fix' task bar icon grouping
   # I sure wish there was an API for this so I didn't have to restart explorer
-  Write-Verbose -Message 'Checking Task Bar buttons display preference'
+  Write-Verbose -Message ' # Checking Task Bar buttons display preference #'
   if ($((Get-ItemProperty -Path HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced -Name TaskbarGlomLevel).TaskbarGlomLevel) -ne 1) {
     Write-Output -InputObject 'Setting registry preference to group task bar icons, and re-starting explorer to activate the new setting.'
     Set-ItemProperty -Path HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced -Name TaskbarGlomLevel -Value 1 -Force
@@ -154,36 +160,34 @@ if (-not $onServer) {
 }
 
 Write-Debug -Message (' # # # $VerbosePreference: {0} # # #' -f $VerbosePreference)
-Write-Verbose -Message 'Checking that .\scripts\ folder is available'
+Write-Verbose -Message ' # Checking that .\scripts\ folder is available #'
 $atWork = $false
 if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType Container)) {
-    Write-Verbose -Message 'Loading scripts from .\scripts\ ...'
+    Write-Verbose -Message ' # Loading scripts from .\scripts\ ... #'
     Write-Output -InputObject ''
 
-    Write-Verbose -Message ' ... loading Merge-MyPSFiles.ps1'
+    Write-Verbose -Message ' # Initializing Merge-MyPSFiles.ps1 #'
     # dot-source script file containing Merge-MyPSFiles and related functions
     . $myPSScriptsPath\Merge-MyPSFiles.ps1
 
     # dot-source script file containing Get-MyNewHelp function
-    Write-Verbose -Message 'Initializing Get-MyNewHelp.ps1'
+    Write-Verbose -Message ' # Initializing Get-MyNewHelp.ps1 #'
     . $myPSScriptsPath\Get-MyNewHelp.ps1
 
-    Write-Verbose -Message 'Test network availability of work domain'
+    Write-Verbose -Message ' # Test network availability of work domain #'
     $atWork = $False
-    # [bool]($NetInfo.IPAddress -match "^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$") -or
-    # Test-Connection is not supported in PS Core 6, so replaced with custom Test-Port function
+    # Test-Connection cmdlet is not included in PS Core 6, so replaced with custom Test-Port function
     # Test-Port -Target $env:USERDNSDOMAIN -Port 445 | Format-List -Property ConnectionStatus, PortNumber, TargetHostName, TargetHostStatus
     # $ConnectionStatus = Test-Port -Target $env:USERDNSDOMAIN -Port 445 | Format-List -Property ConnectionStatus, PortNumber, TargetHostName, TargetHostStatus
-    Get-Command -Name Test-Port
-    if ((Test-Port -Target $env:USERDNSDOMAIN -Port 445).ConnectionStatus = 'Success') {
+    if ((Test-Port -Target $env:USERDNSDOMAIN -Port 445).ConnectionStatus -eq 'Success') {
         $atWork = $True
     }
 
-    Write-Verbose -Message ' ... loading NetSiteName.ps1'
+    Write-Verbose -Message ' # Initializing NetSiteName.ps1 #'
     # dot-source script file containing Get-NetSite function
     . $myPSScriptsPath\NetSiteName.ps1
 
-    Write-Verbose -Message '     Getting $NetInfo (IPAddress, SiteName)'
+    Write-Verbose -Message ' #      Getting $NetInfo (IPAddress, SiteName) #'
     # Get network / site info
     $NetInfo = Get-NetSite | Select-Object -Property IPAddress, SiteName -ErrorAction Stop
     if ($NetInfo) {
@@ -191,27 +195,27 @@ if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType
         if ($atWork) {
             $SiteType = 'Work'
         }
-        Write-Output -InputObject ("Connected at {0} site: $($NetInfo.SiteName) (Address: $($NetInfo.IPAddress))" -f $SiteType) 
+        Write-Output -InputObject ('Connected at {0} site: {1} (Address: {2})' -f $SiteType, $NetInfo.SiteName, $NetInfo.IPAddress[0])
     } else {
         Write-Warning -Message ('Failed to enumerate Network Site Info: {0}' -f $NetInfo)
     }
-    
+
     # dot-source script file containing Citrix XenApp functions
-    Write-Verbose -Message 'Initializing Start-XenApp.ps1'
+    Write-Verbose -Message ' # Initializing Start-XenApp.ps1 #'
     . $myPSScriptsPath\Start-XenApp.ps1
-    
-    Write-Verbose -Message 'Get-SystemCitrixInfo'
+
+    Write-Verbose -Message ' # Get-SystemCitrixInfo #'
     # Confirms $Global:onServer and defines/updates $Global:OnXAHost, and/or fetched Receiver version
     Get-SystemCitrixInfo | Format-List
-    
+
     # dot-source script file containing my XenApp functions
-    Write-Verbose -Message 'Initializing GBCI-XenApp.ps1'
+    Write-Verbose -Message ' # Initializing GBCI-XenApp.ps1 #'
     . $myPSScriptsPath\GBCI-XenApp.ps1
 } else {
     Write-Warning -Message ('Failed to locate Scripts folder {0}; run any scripts.' -f $myPSScriptsPath)
 }
 
-Write-Verbose -Message 'Declaring function Save-Credential'
+Write-Verbose -Message ' # Declaring function Save-Credential #'
 function Save-Credential {
     [cmdletbinding(SupportsShouldProcess)]
     Param(
@@ -225,38 +229,34 @@ function Save-Credential {
     )
 
     $SaveCredential = $false
-    # if ($Global:onServer) {
-        Write-Verbose -Message ('Starting Save-Credential $Global:onServer = {0}' -f $Global:onServer)
-        $VarValueSet = [bool](Get-Variable -Name $Variable -ValueOnly -ErrorAction SilentlyContinue)
-        Write-Verbose -Message ('$VarValueSet = ''{0}''' -f $VarValueSet)
-        if ($VarValueSet) {
-            Write-Warning -Message ('Variable ''{0}'' is already defined' -f $Variable)
-            if ((read-host -prompt ('Would you like to update/replace the credential stored in {0}`? [y]|n' -f $Variable)) -ne 'y') {
-                Write-Warning -Message 'Ok. Aborting Save-Credential.'
-            }
+    $VarValueSet = [bool](Get-Variable -Name $Variable -ValueOnly -ErrorAction SilentlyContinue)
+    Write-Debug -Message ('$VarValueSet = ''{0}''' -f $VarValueSet)
+    if ($VarValueSet) {
+        Write-Warning -Message ('Variable ''{0}'' is already defined' -f $Variable)
+        if ((read-host -prompt ('Would you like to update/replace the credential stored in {0}`? [y]|n' -f $Variable)) -ne 'y') {
+            Write-Warning -Message 'Ok. Aborting Save-Credential.'
+        }
+    } else {
+        Write-Verbose -Message ('Credential will be saved to variable ''{0}''' -f $Variable)
+        $SaveCredential = $true
+    }
+
+    Write-Debug -Message ('$SaveCredential = {0}' -f $SaveCredential)
+    if ($SaveCredential) {
+        if ($USERNAME -NotMatch '\d$') {
+            $UName = $($USERNAME + '2')
         } else {
-            $SaveCredential = $true
+            $UName = $USERNAME
         }
 
-        Write-Verbose -Message ('$SaveCredential = {0}' -f $SaveCredential)
-        if ($SaveCredential) {
-            if ($USERNAME -NotMatch '\d$') {
-                $UName = $($USERNAME + '2')
-            } else {
-                $UName = $USERNAME
-            }
-
-            Write-Output -InputObject ''
-            Write-Output -InputObject ' # Prompting to capture elevated credentials. #'
-            Write-Output -InputObject ' ...'
-            Set-Variable -Name $Variable -Value $(Get-Credential -UserName $UName -Message 'Store admin credentials for convenient use later.') -Scope Global -Description 'Stored admin credentials for convenient re-use.'
-            if ($?) {
-                Write-Output -InputObject ('Elevated credentials stored in variable: {0}.' -f $Variable)
-            }
+        Write-Output -InputObject ''
+        Write-Output -InputObject ' # Prompting to capture elevated credentials. #'
+        Write-Output -InputObject ' ...'
+        Set-Variable -Name $Variable -Value $(Get-Credential -UserName $UName -Message 'Store admin credentials for convenient use later.') -Scope Global -Description 'Stored admin credentials for convenient re-use.'
+        if ($?) {
+            Write-Output -InputObject ('Elevated credentials stored in variable: {0}.' -f $Variable)
         }
-    # } else {
-    #     Write-Verbose -Message 'Skipping Save-Credential'
-    # }
+    }
 } # end Save-Credential
 
 New-Alias -Name rdp -Value Start-RemoteDesktop -ErrorAction Ignore
@@ -290,11 +290,11 @@ Write-Verbose -Message ('$UpdateHelp: {0}' -f $UpdateHelp)
 
 # Try to update PS help files, if we have local admin rights
 # Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
-if (Get-Variable -Name IsAdmin -ErrorAction Ignore) { 
+if (Get-Variable -Name IsAdmin -ErrorAction Ignore) {
     Write-Verbose -Message ('$IsAdmin: {0}' -f $IsAdmin);
 } else {
-    Write-Verbose -Message '$IsAdmin is not defined. Trying Test-LocalAdmin'
-    if (Get-Command -Name Test-LocalAdmin -ErrorAction Ignore) { 
+    Write-Verbose -Message ' # $IsAdmin is not defined. Trying Test-LocalAdmin #'
+    if (Get-Command -Name Test-LocalAdmin -ErrorAction Ignore) {
         $IsAdmin = Test-LocalAdmin;
     }
     Write-Verbose -Message ('$IsAdmin: {0}' -f $IsAdmin);
@@ -315,8 +315,9 @@ if ($UpdateHelp -and $IsAdmin) {
 # else ... if not local admin, we don't have permissions to update help files.
 #End Region
 
+#requires -module Edit-Module
 Write-Output -InputObject '# [PSEdit] #'
-if (-not($Env:PSEdit)) {
+if (-not ($Env:PSEdit)) {
     if (Test-Path -Path $HOME\vscode\app\code.exe -PathType Leaf) {
         Assert-PSEdit -Path (Resolve-Path -Path $HOME\vscode\app\code.exe)
     } else {
@@ -326,25 +327,30 @@ if (-not($Env:PSEdit)) {
 Write-Output -InputObject ''
 
 # if connected to work network, initiate logging on to work, via Set-Workplace function
+Write-Verbose -Message ('At work = ''{0}''' -f $atWork)
 if ($atWork) {
     $thisHour = (Get-Date -DisplayHint Time).Hour
     # $OnXAHost = Get-ProcessByUser -ProcessName 'VDARedirector.exe' -ErrorAction Ignore
     if (($thisHour -ge 6) -and ($thisHour -le 18)) {
-        Write-Verbose -Message 'Save-Credential'
-        Save-Credential
-        if ((-not $Global:onServer) -or $Global:OnXAHost) {
+        if ($Global:OnXAHost) {
             Write-Output -InputObject ' # # # Start-CitrixSession # # #'
             # From .\Scripts\Start-XenApp.ps1
             Start-CitrixSession
-        } elseif (-not $Global:onServer) {
+            Write-Verbose -Message ' # Save-Credential #'
+            Save-Credential
+        }
+        # Start with Set-Workplace on a Client
+        # # Set-Workplace in-turn invokes Start-CitrixSession via configuration in Sperry.json (in Sperry module)
+        if (-not $Global:onServer) {
             # From .\Scripts\GBCI-XenApp.ps1
-            Write-Output -InputObject ' # # # Set-Workplace -Zone Office # # #'
+            Write-Output -InputObject ' # # Set-Workplace -Zone Office # #'
             Set-Workplace -Zone Office
         }
     }
 } else {
+    Write-Verbose -Message 'Dismount-Path'
     Dismount-Path
-    Write-Output -InputObject "`n # # # Work network not detected. Run 'Set-Workplace -Zone Remote' to switch modes.`n`n"
+    Write-Output -InputObject ' # # # Work network not detected. Run ''Set-Workplace -Zone Remote'' to switch modes.'
 }
 
 # Write-Output -InputObject '# Pre-log backup #'
