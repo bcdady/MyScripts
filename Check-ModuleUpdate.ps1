@@ -11,8 +11,7 @@
 param ()
 
 Write-Verbose -Message 'Defining function Find-ModuleUpdate' -Verbose
-function Find-ModuleUpdate
-{
+function Find-ModuleUpdate {
     [cmdletbinding()]
     Param()
 
