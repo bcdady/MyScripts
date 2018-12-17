@@ -49,7 +49,7 @@ Set-StrictMode -Version latest
         'Visibility'         = $Private:MyVisibility
     }
     # $Script:MyScriptInfo = New-Object -TypeName PSObject -Property $Private:properties
-    New-Variable -Name MyScriptInfo -Value (New-Object -TypeName PSObject -Property $Private:properties) -Scope Local -Option AllScope -Force
+    New-Variable -Name MyScriptInfo -Value (New-Object -TypeName PSObject -Property $Private:properties) -Option AllScope -Force
     # Cleanup
     foreach ($var in $Private:properties.Keys) {
         Remove-Variable -Name ('My{0}' -f $var) -Force
@@ -64,35 +64,12 @@ Set-StrictMode -Version latest
     Write-Verbose -Message '[Merge-MyPSFiles] $MyScriptInfo populated'
 #End Region
 
-# Clean Up this script's Variables. When this script is loaded (dot-sourced), we clean up Merge-MyPSFiles specific variables to ensure they're current when the next function is invoked
-('MyMergeSettings', 'DiffTool', 'DiffToolArgs', 'MergeEnvironmentSet', 'netPSHome') | ForEach-Object {
-  # Cleanup any Private Scope residue
-  if (Get-Variable -Name $PSItem -Scope Private -ErrorAction Ignore) {
-    Write-Verbose -Message ('Remove-Variable $Private:{0}' -f $PSItem)
-    Remove-Variable -Name $PSItem -Scope Private
-  } else {
-    Write-Verbose -Message ('Variable $Private:{0} not found.' -f $PSItem)
-  }
-  # Cleanup any Local Scope residue
-  if (Get-Variable -Name $PSItem -Scope Local -ErrorAction Ignore) {
-    Write-Verbose -Message ('Remove-Variable $Local:{0}' -f $PSItem)
-    Remove-Variable -Name $PSItem -Scope Local
-  } else {
-    Write-Verbose -Message ('Variable $Local:{0} not found.' -f $PSItem)
-  }
-  # Cleanup any Script Scope residue
-  if (Get-Variable -Name $PSItem -Scope Script -ErrorAction Ignore) {
-    Write-Verbose -Message ('Remove-Variable $Script:{0}' -f $PSItem)
-    Remove-Variable -Name $PSItem -Scope Script
-  } else {
-    Write-Verbose -Message ('Variable $Script:{0} not found.' -f $PSItem)
-  }
-} # End Clean Up
-
 # Declare shared variables, to be available across/between functions
-New-Variable -Name MySettingsFile -Description 'Path to Merge-MyPSFiles settings file' -Value 'MyPSfiles.json' -Scope Local -Option AllScope -Force
-New-Variable -Name MyMergeSettings -Description ('Settings, from {0}' -f $Local:MySettingsFile) -Scope Local -Option AllScope -Force
-New-Variable -Name MergeEnvironmentSet -Description 'Boolean indicating custom environmental variables are loaded / available' -Value $false -Scope Local -Option AllScope -Force
+Set-Variable -Name MySettingsFile -Description 'Path to Merge-MyPSFiles settings file' -Value 'MyPSfiles.json' -Scope Local -Option AllScope -Force
+
+if (-not (Get-Variable -Name MergeSettings -ErrorAction 'SilentlyContinue')) {
+  Set-Variable -Name MergeSettings -Description ('Settings, from {0}' -f $MySettingsFile) -Scope Local -Option AllScope -Force
+}
 
 <#
     $Private:CompareDirectory = Join-Path -Path $(Split-Path -Path $PSCommandPath -Parent) -ChildPath 'Compare-Directory.ps1' -ErrorAction Stop
@@ -122,111 +99,62 @@ Function Import-MyMergeSettings {
         "`n # variables in Private scope #"
         get-variable -scope Private
     #>
-    
-    Write-Debug -Message ('$DSPath = Join-Path -Path {0} -ChildPath {1}' -f (Split-Path -Path $PSCommandPath -Parent), $Local:MySettingsFile)
 
-    $DSPath = Join-Path -Path $(Split-Path -Path $PSCommandPath -Parent) -ChildPath $Local:MySettingsFile
-    Write-Debug -Message ('$MyMergeSettings = (Get-Content -Path {0} ) -join "`n" | ConvertFrom-Json' -f $DSPath)
+    Write-Debug -Message ('$DSPath = Join-Path -Path {0} -ChildPath {1}' -f (Split-Path -Path $PSCommandPath -Parent), $MySettingsFile)
 
-    #try {
-    $MyMergeSettings = (Get-Content -Path $DSPath) -join "`n" | ConvertFrom-Json #-ErrorAction Stop
-    #}
-    #catch {
+    $DSPath = Join-Path -Path $(Split-Path -Path $PSCommandPath -Parent) -ChildPath $MySettingsFile
+    Write-Debug -Message ('$MergeSettings = (Get-Content -Path {0} ) -join "`n" | ConvertFrom-Json' -f $DSPath)
+
+    $MyMergeSettings = (Get-Content -Path $DSPath) -join "`n" | ConvertFrom-Json
+
     if ($?) {
-        Write-Verbose -Message 'Settings imported to $MyMergeSettings.' 
+        Write-Verbose -Message ('$MyMergeSettings imported from {0}' -f $DSPath)
     } else {
         throw ('[Import-MyMergeSettings]: Critical Error loading settings from from {0}' -f $DSPath)
     }
 
-    if ($MyMergeSettings) {
-        $MyMergeSettings | Add-Member -NotePropertyName imported -NotePropertyValue (Get-Date -UFormat '%m-%d-%Y') -Force
-        $MyMergeSettings | Add-Member -NotePropertyName SourcePath -NotePropertyValue $DSPath -Force
-
-        if ($IsVerbose -or $ShowSettings) {
-            Write-Output -InputObject ' [Verbose] $MyMergeSettings:' | Out-Host
-            Write-Output -InputObject $MyMergeSettings | Out-Host
-        }
+    if ($MergeSettings) {
+        $MergeSettings | Add-Member -NotePropertyName RepositorySets -NotePropertyValue $MyMergeSettings.RepositorySets -Force
+        $MergeSettings | Add-Member -NotePropertyName MergeTool -NotePropertyValue $MyMergeSettings.MergeTool -Force
+        $MergeSettings | Add-Member -NotePropertyName About -NotePropertyValue $MyMergeSettings.About -Force
+        $MergeSettings | Add-Member -NotePropertyName imported -NotePropertyValue (Get-Date Get-Date -Format g) -Force # -UFormat '%m-%d-%Y')
+        $MergeSettings | Add-Member -NotePropertyName SourcePath -NotePropertyValue $DSPath -Force
+    } else {
+      $MergeSettings = $MyMergeSettings
     }
-
+    if ($IsVerbose -or $ShowSettings) {
+      Write-Output -InputObject ' [Verbose] $MergeSettings:'
+      Write-Output -InputObject $MergeSettings | Format-List
+    }
 } # end function Import-MyMergeSettings
-
-Write-Verbose -Message 'Declaring Function Get-Environment'
-function Get-Environment {
-  [CmdletBinding(SupportsShouldProcess)]
-  param ()
-
-  if (Get-Variable -Name myPSLogPath -ErrorAction Ignore) {
-    Write-Verbose -Message ('Logging previously initialized. $myPSLogPath: {0}' -f $myPSLogPath)
-  } else {
-    Write-Verbose -Message '[Bootstrap] Initialize PowerShell Custom Environment Variables.'
-    # Load/invoke bootstrap
-    if (Test-Path -Path (Join-Path -Path $myPSHome -ChildPath 'bootstrap.ps1')) {
-      . (Join-Path -Path $myPSHome -ChildPath 'bootstrap.ps1')
-
-      if (Get-Variable -Name 'myPS*' -ValueOnly -ErrorAction Ignore) {
-        Write-Output -InputObject ''
-        Write-Output -InputObject 'My PowerShell Environment:'
-        Get-Variable -Name 'myPS*' | Format-Table
-      } else {
-        Write-Warning -Message ('Failed to enumerate My PowerShell Environment as should have been initialized by bootstrap script: {0}'-f (Join-Path -Path $myPSHome -ChildPath 'bootstrap.ps1'))
-      }
-    } else {
-      throw ('Failed to bootstrap: {0}\bootstrap.ps1' -f $myPSHome)
-    }
-    Write-Verbose -Message ('Logging initialized. $myPSLogPath: {0}' -f $myPSLogPath)
-  }
-
-  if ($myPSHome -match "$env:SystemDrive") {
-    Write-Verbose -Message ('Set $localPSHome to {0}' -f $myPSHome)
-    #$localPSHome = $myPSHome
-    Set-Variable -Name localPSHome -Value $myPSHome -Scope Local
-  } else {
-    $localPSHome = Join-Path -Path $env:USERPROFILE -ChildPath '*Documents\WindowsPowerShell' -Resolve
-    Set-Variable -Name localPSHome -Value $localPSHome -Scope Local
-  }
-
-  # If %HOMEDRIVE% does not match %SystemDrive%, then it's a network drive, so use that 
-  if ($env:HOMEDRIVE -ne $env:SystemDrive) {
-    if (Test-Path -Path $env:HOMEDRIVE) {
-      $netPSHome = (Join-Path -Path $env:HOMEDRIVE -ChildPath '*\WindowsPowerShell' -Resolve)
-      Write-Verbose -Message ('Set $netPSHome to {0}' -f $netPSHome)
-      Set-Variable -Name netPSHome -Value $netPSHome -Scope Local
-    } else {
-      Write-Warning -Message 'Test-Path -Path $env:HOMEDRIVE: $false'
-    }
-  } else {
-    Write-Warning -Message '($env:HOMEDRIVE -ne $env:SystemDrive): $false'
-  }
-
-  Set-Variable -Name MergeEnvironmentSet -Description 'Boolean indicating custom environmental variables are loaded / available' -Value $true
-} # end function Get-Environment
 
 Write-Verbose -Message 'Declaring Function Merge-MyPSFiles'
 function Merge-MyPSFiles {
     [CmdletBinding(SupportsShouldProcess)]
     param()
 
-    if ($MyMergeSettings -and ($MyMergeSettings.imported)) {
-        Write-Verbose -Message ('{0} already instantiated.' -f $MyMergeSettings)
+    if (Select-Object -InputObject MergeSettings -ExpandProperty RepositorySets -ErrorAction SilentlyContinue) {
+      Write-Verbose -Message ('{0} already instantiated (at {1}).' -f $MergeSettings.About, $MergeSettings.imported)
     } else {
-        Write-Verbose -Message ('Read configs from {0} to $MyMergeSettings' -f $Local:MySettingsFile)
+        Write-Verbose -Message ('Read configs from {0} to $MergeSettings' -f $MySettingsFile)
         Import-MyMergeSettings
     }
 
-    if ($MergeEnvironmentSet) {
-        Write-Verbose -Message 'Merge-MyPSFiles environmental variables already instantiated.'
-    } else {
-        Write-Verbose -Message 'Load custom environmental variables with Get-Environment function'
-        Get-Environment
-    }
-
+    <#
+      if ($MergeEnvironmentSet) {
+          Write-Verbose -Message 'Merge-MyPSFiles environmental variables already instantiated.'
+      } else {
+          Write-Verbose -Message 'Load custom environmental variables with Get-Environment function'
+          Get-Environment
+      }
+    #>
     # Specifying the logFile name now explicitly updates the datestamp on the log file
-    $logFile = $(Join-Path -Path $myPSLogPath -ChildPath ('{0}-{1}.log' -f $($MyScriptInfo.CommandName.Split('.'))[0], (Get-Date -UFormat '%Y%m%d')))
+    $logFile = $(Join-Path -Path $myPSLogPath -ChildPath ('{0}-{1}.log' -f $($MyScriptInfo.CommandName.Split('.'))[0], (Get-Date -Format FileDate)))
     Write-Output -InputObject '' | Tee-Object -FilePath $LogFile -Append
     Write-Verbose -Message (' # Logging to {0}' -f $LogFile)
     Write-Output -InputObject ('{0} # Starting Merge-MyPSFiles' -f (Get-Date -Format g)) | Tee-Object -FilePath $logFile -Append
 
-    $MyRepositories = $MyMergeSettings | Select-Object -ExpandProperty RepositorySets
+    $MyRepositories = $MergeSettings | Select-Object -ExpandProperty RepositorySets
     Write-Verbose -Message ('MyRepositories: {0} ' -f $MyRepositories)
 
     ForEach ($repo in $MyRepositories) {
@@ -238,14 +166,22 @@ function Merge-MyPSFiles {
         Write-Verbose -Message ('$Target: {0}' -f $TargetPath)
 
         Write-Output -InputObject ('Merging {0}' -f $repo.Name) | Tee-Object -FilePath $logFile -Append
-        Write-Verbose -Message ('[bool](Compare-Directory -ReferenceDirectory {0} -DifferenceDirectory {1} -ExcludeFile *.orig,.git*,.hg*,*.md,*.tests.*)' -f $SourcePath, $TargetPath)
+        #Write-Verbose -Message ('[bool](Compare-Directory -ReferenceDirectory {0} -DifferenceDirectory {1} -ExcludeFile *.orig,.git*,.hg*,*.md,*.tests.*)' -f $SourcePath, $TargetPath)
 
         $Private:GoodSource = $false
         $Private:GoodTarget = $false
+        $Private:NetworkSource = $false
+        $Private:NetworkTarget = $false
         # Test availability of SourcePath, and if missing, re-try Mount-Path function
         if (Test-Path -Path $SourcePath) {
             Write-Verbose -Message ('Confirmed source $SourcePath: {0} is available.' -f $SourcePath)
             $Private:GoodSource = $true
+            # Determine if SourcePath is a network share / path
+            if ($SourcePath[0] -ne $env:SystemDrive[0]) {
+                if ($SourcePath[0] -in ((get-psdrive -PSProvider FileSystem | where {$_.Root -ne "$env:SystemDrive\"}).Name)) {
+                    $Private:NetworkSource = $true
+                }
+            }
         } else {
             # Show warning message
             Write-Warning -Message ('Source ''{0}'' is NOT available.' -f (Split-Path -Path $TargetPath -Parent ))
@@ -257,44 +193,54 @@ function Merge-MyPSFiles {
         if (Test-Path -Path (Split-Path -Path $TargetPath -Parent)) {
             Write-Verbose -Message ('Confirmed TargetPath (parent): {0} is available.' -f (Split-Path -Path ($TargetPath) -Parent))
             $Private:GoodTarget = $true
+            # Determine if TargetPath is a network share / path
+            if ($TargetPath[0] -ne $env:SystemDrive[0]) {
+                if ($TargetPath[0] -in ((get-psdrive -PSProvider FileSystem | where {$_.Root -ne "$env:SystemDrive\"}).Name)) {
+                    $Private:NetworkTarget = $true
+                }
+            }
         } else {
             # Show warning message
             Write-Warning -Message ('Target ''{0}'' is NOT available.' -f (Split-Path -Path $TargetPath -Parent ))
-            <#
-                # Invoke Mount-Path function, from Sperry module, to map all user's drives
-                #Mount-Path
-                # Re-Test availability of TargetPath, and if still missing, halt
-                if (Test-Path -Path (Split-Path -Path $TargetPath -Parent)) {
-	                Write-Verbose -Message ('Confirmed TargetPath (parent): {0} is available.' -f (Split-Path -Path ($TargetPath) -Parent))
-	                $Private:GoodToGo = $true
-	            } else {
-	                # Invoke Mount-Path function, from Sperry module, to map all user's drives
-	                Write-Warning -Message 'TargetPath (parent) is still NOT available.'
-	            }
-			#>
+        }
+
+        if ($Private:NetworkSource -and $Private:NetworkTarget) {
+            if ($Global:onServer) {
+                Write-Verbose -Message 'OK to proceed with copying network source repo to network target, while $onServer.'
+            } else {
+                Write-Warning -Message '# Don''t copy from a network source, to a network target, unless $onServer.'
+              $Private:GoodTarget = $false
+          }
         }
 
         if ($Private:GoodSource -and $Private:GoodTarget) {
             # Compare Directories (via contained file hashes) before sending to Merge-Repository
-            Write-Verbose -Message ('Compare-Directory -ReferenceDirectory {0} -DifferenceDirectory {1}' -f $SourcePath, $TargetPath)
-            $Private:DirectoryMatch = (Compare-Directory -ReferenceDirectory $SourcePath -DifferenceDirectory $TargetPath -ExcludeFile '*.orig','.git*','.hg*','*.md','*.tests.*')
-            Write-Verbose -Message ('Compare-Directory results in Source/Destination Match? : {0}' -f $Private:DirectoryMatch)
+            #Write-Verbose -Message ('Compare-Directory -ReferenceDirectory {0} -DifferenceDirectory {1}' -f $SourcePath, $TargetPath)
+            #$Private:DirectoryMatch = (Compare-Directory -ReferenceDirectory $SourcePath -DifferenceDirectory $TargetPath -ExcludeFile '*.orig','.git*','.hg*','*.md','*.tests.*')
+            #Write-Verbose -Message ('Compare-Directory results in Source/Destination Match? : {0}' -f $Private:DirectoryMatch)
             # if (Compare-Directory -ReferenceDirectory $($SourcePath) -DifferenceDirectory $($TargetPath) -ExcludeFile "*.orig",".git*",".hg*","*.md","*.tests.*") {
-            if ($Private:DirectoryMatch) {
-                Write-Verbose -Message 'No differences detected ... Skipping merge.'
-            } else {
-                Write-Verbose -Message 'Compare-Directory function indicates differences detected between repositories. Proceeding with Merge-Repository.'
-                Write-Verbose -Message ('Merge-Repository -SourcePath {0} -TargetPath {1} -Recurse' -f $SourcePath, $TargetPath) | Tee-Object -FilePath $logFile -Append
-                Merge-Repository -SourcePath $SourcePath -TargetPath $TargetPath -Recurse
-            } # end if Compare-Directory
+            #    Write-Verbose -Message 'No differences detected ... Skipping merge.'
+            #} else {
+            #    Write-Verbose -Message 'Compare-Directory function indicates differences detected between repositories. Proceeding with Merge-Repository.'
+            #} # end if Compare-Directory
+
+            #Merge-Repository invokes the application pointed to by $MergeTool, which, if we're running from Core may need to be redirected
+            if (($MergeSettings.MergeTool.Path -match 'myPSModulesPath') -and ($myPSModulesPath -match '\\PowerShell')) {
+              $myPSModulesPath = $myPSModulesPath -replace '\\PowerShell','\\WindowsPowerShell'
+            }
+
+            Write-Verbose -Message ('Merge-Repository -SourcePath {0} -TargetPath {1} -Recurse' -f $SourcePath, $TargetPath) | Tee-Object -FilePath $logFile -Append
+            Merge-Repository -SourcePath $SourcePath -TargetPath $TargetPath -Recurse
+            # When run in PowerShell Core (6) - the console doesn't pause while the MergeTool is running
+            # so we pause after starting Merge-Repository to better control flow of multiple merges
+            if ($PSEdition -eq 'Core') {pause}
         } else {
             Write-Output -InputObject ''
-            Write-Warning -Message 'Fatal Error validating source Path and target Destination'
+            Write-Warning -Message 'Error validating source Path and target Destination'
             Write-Verbose -Message ('$Private:GoodSource: {0} // $Private:GoodTarget: {1}' -f $Private:GoodSource, $Private:GoodTarget)
         }
         Write-Output -InputObject ''
     }
-  #EndRegion
 
   Write-Output -InputObject ('{0} # Ending Merge-MyPSFiles' -f (Get-Date -Format g)) | Tee-Object -FilePath $logFile -Append
   # ======== THE END ======================
@@ -309,17 +255,18 @@ function Merge-Modules {
   param()
 
   if (-not [bool](Get-Variable -Name MyMergeSettings -ErrorAction Ignore)) {
-    Write-Verbose -Message ('Reading configs from {0}' -f $Local:MySettingsFile)
+    Write-Verbose -Message ('Reading configs from {0}' -f $MySettingsFile)
     Import-MyMergeSettings
   }
 
+<#
   if (-not $MergeEnvironmentSet) {
     Write-Verbose -Message 'Load custom environmental variables with Get-Environment function'
     Get-Environment
   }
-
+#>
   # Specifying the logFile name now explicitly updates the date stamp on the log file
-  $logFile = $(Join-Path -Path $myPSLogPath -ChildPath ('{0}-{1}.log' -f $($MyScriptInfo.CommandName.Split('.'))[0], (Get-Date -UFormat '%Y%m%d')))
+  $logFile = $(Join-Path -Path $myPSLogPath -ChildPath ('{0}-{1}.log' -f $($MyScriptInfo.CommandName.Split('.'))[0], (Get-Date -Format FileDate)))
   Write-Output -InputObject '' | Tee-Object -FilePath $logFile -Append
   Write-Verbose -Message (' # Logging to {0}' -f $logFile)
   Write-Output -InputObject ('{0} # Starting Merge-Modules' -f (Get-Date -Format g)) | Tee-Object -FilePath $logFile -Append
@@ -327,7 +274,7 @@ function Merge-Modules {
   # EXAMPLE   : PS .\> .\Merge-MyPSFiles.ps1 -SourcePath .\Modules\ProfilePal -TargetPath ..\GitHub\
   # Technically, per kdiff3 Help, the name of the directory-to-be-merged only needs to be specified once, when the all are the same, just at different root paths.
 
-  $MyModuleNames = $MyMergeSettings | Select-Object -ExpandProperty RepositorySets | ForEach-Object {$_.Name.split('_')[1]} | Sort-Object -Unique
+  $MyModuleNames = $MergeSettings | Select-Object -ExpandProperty RepositorySets | ForEach-Object {$_.Name.split('_')[1]} | Sort-Object -Unique
   Write-Debug -Message ('$MyModuleNames: {0}' -f $MyModuleNames)
   $3PModules = Get-Module -ListAvailable -Refresh | Where-Object -FilterScript {($PSItem.Name -notin $MyModuleNames) -and ($PSItem.Path -notlike '*system32*')} | Select-Object -Unique -Property Name,ModuleBase
   Write-Debug -Message ('$3PModules: {0}' -f $3PModules)
@@ -357,7 +304,7 @@ function Merge-Modules {
         Write-Verbose -Message ('$rcTarget: {0}' -f $rcTarget) | Tee-Object -FilePath $logFile -Append
 
         Write-Output -InputObject ('Preparing to mirror {0} (from {1} to {2})' -f $module.Name, $rcSource, $rcTarget) | Tee-Object -FilePath $logFile -Append
-                
+
         # To test these paths, we first need to determine if there are spaces in the path string, which need to be escaped
         Write-Debug -Message ('(Test-Path -Path {0})' -f $rcSource)
         Write-Debug -Message $(Test-Path -Path $rcSource)
@@ -368,7 +315,7 @@ function Merge-Modules {
         #if ((Test-Path -Path $rcSource) -or (Test-Path -Path $rcTarget)) {
         if (Test-Path -Path $rcSource) {
           # robocopy.exe writes wierd characters, if/when we let it share, so robocopy gets it's own log file
-          #$RCLogFile = $(Join-Path -Path $myPSLogPath -ChildPath ('{0}-robocopy-{1}.log' -f $($MyScriptInfo.CommandName.Split('.'))[0], (Get-Date -UFormat '%Y%m%d')))
+          #$RCLogFile = $(Join-Path -Path $myPSLogPath -ChildPath ('{0}-robocopy-{1}.log' -f $($MyScriptInfo.CommandName.Split('.'))[0], (Get-Date -Format FileDate)))
           Write-Verbose -Message ('[Merge-Modules] Update-Repository {0} Source: {1} Destination: {2}' -f $module.Name, $rcSource, $rcTarget) | Tee-Object -FilePath $logFile -Append
           Update-Repository -Name $module.Name -Path $rcSource -Destination $rcTarget
 
@@ -391,6 +338,6 @@ function Merge-Modules {
   Write-Output -InputObject ''
   Write-Output -InputObject ('{0} # Ending Merge-Modules' -f (Get-Date -Format g)) | Tee-Object -FilePath $logFile -Append
   Write-Output -InputObject ''
-  
+
   # ======== THE END ======================
 } # end function Merge-Modules

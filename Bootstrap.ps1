@@ -110,8 +110,8 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
         $Global:IsLinux   = $False
         $Global:IsMacOS   = $False
         $Global:IsAdmin   = $False
-        if (-not (Get-Variable -Name PSEdition -Scope Global -ErrorAction SilentlyContinue)) {
-            $Global:PSEdition = ''
+        if (-not $PSEdition) {
+            $Global:PSEdition = 'Desktop'
         }
     }
 
@@ -271,7 +271,7 @@ if ($IsVerbose) { Write-Output -InputObject '' }
     Write-Verbose -Message 'Checking $Env:PSModulePath for user modules path ($myPSModulesPath)'
     if ($IsWindows) {
         # In Windows, semicolon is used to separate entries in the PATH variable
-        $SplitChar = ';'
+        $Private:SplitChar = ';'
 
         #Define modules, scripts, and log folders within user's PowerShell folder, creating the SubFolders if necessary
         $myPSModulesPath = (Join-Path -Path $myPSHome -ChildPath 'Modules')

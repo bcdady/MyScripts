@@ -9,7 +9,7 @@
 #========================================
 [CmdletBinding()]
 param ()
-Set-StrictMode -Version latest
+#Set-StrictMode -Version latest
 
 # Uncomment the following 2 lines for testing profile scripts with Verbose output
 #'$VerbosePreference = ''Continue'''
@@ -154,19 +154,19 @@ Get-ExecutionPolicy -List | Format-Table -AutoSize
 Write-Verbose -Message ('$HostOS = ''{0}''' -f $HostOS)
 # Detect host OS and then jump to the OS specific profile sub-script
 if ($IsLinux) {
-    $SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-Linux.ps1')
+    $Private:SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-Linux.ps1')
 }
 
 if ($IsMacOS) {
-    $SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-macOS.ps1')
+    $Private:SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-macOS.ps1')
 }
 
 if ($IsWindows) {
-    $SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-Windows.ps1')
+    $Private:SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-Windows.ps1')
 }
 
 if ($IsVerbose) {Write-Output -InputObject ''}
-Write-Verbose -Message ('$SubProfile = ''{0}''' -f $SubProfile)
+Write-Verbose -Message ('$SubProfile = ''{0}''' -f $Private:SubProfile)
 
 # Load/invoke OS specific profile sub-script
 if (Test-Path -Path $SubProfile) {
