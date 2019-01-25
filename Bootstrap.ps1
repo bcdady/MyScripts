@@ -110,8 +110,8 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
         $Global:IsLinux   = $False
         $Global:IsMacOS   = $False
         $Global:IsAdmin   = $False
-        if (-not $PSEdition) {
-            $Global:PSEdition = 'Desktop'
+        if (-not (Get-Variable -Name PSEdition -Scope Global -ErrorAction SilentlyContinue)) {
+            $Global:PSEdition = ''
         }
     }
 
@@ -208,7 +208,7 @@ if ($IsVerbose) { Write-Output -InputObject '' }
             Write-Verbose -Message ('$myPSHome checks out as local: {0}.' -f $myPSHome)
         } else {
             Write-Warning -Message ('$myPSHome is NOT local: {0}.' -f $myPSHome)
-            # $myPSHome = Resolve-Path -Path $Env:USERPROFILE
+            $myPSHome = Resolve-Path -Path $Env:USERPROFILE
         }
     }
 
@@ -303,10 +303,12 @@ if ($IsVerbose) { Write-Output -InputObject '' }
 
     Write-Verbose -Message ('My PS Modules Path: {0}' -f $myPSModulesPath)
 
+    # Check if $myPSModulesPath is in $Env:PSModulePath, and while we're at it, cleanup $Env:PSModulePath for duplicates
     Write-Debug -Message ('($myPSModulesPath -in @($Env:PSModulePath -split $SplitChar) = {0}' -f ($myPSModulesPath -in @($Env:PSModulePath -split $SplitChar)))
-    if (($null -ne $myPSModulesPath) -and (-not ($myPSModulesPath -in @($Env:PSModulePath -split $SplitChar)))) {
+    $EnvPSModulePath = (($Env:PSModulePath.split($SplitChar)).trim('/')).trim('\') | Sort-Object -Unique
+    if (($null -ne $myPSModulesPath) -and (-not ($myPSModulesPath -in $EnvPSModulePath))) {
         Write-Verbose -Message ('Adding Modules Path: {0} to $Env:PSModulePath' -f $myPSModulesPath) -Verbose
-        $Env:PSModulePath += ('{0}{1}' -f $SplitChar, $myPSModulesPath)
+        $Env:PSModulePath = $($EnvPSModulePath -join(';')) + $('{0}{1}' -f $SplitChar, $myPSModulesPath)
 
         # post-update cleanup
         if (Test-Path -Path (Join-Path -Path $myPSScriptsPath -ChildPath 'Cleanup-ModulePath.ps1') -ErrorAction SilentlyContinue) {
@@ -322,13 +324,15 @@ function Get-CustomModule {
     return Get-Module -ListAvailable | Where-Object -FilterScript {$PSItem.ModuleType -eq 'Script' -and $PSItem.Author -NotLike 'Microsoft Corporation'}
 }
 
-write-output -InputObject ''
-write-output -InputObject ' # To enumerate available Custom Modules, run:'
-write-output -InputObject '   # Get-CustomModule | Format-Table -Property Name, Description'
+<#
+    write-output -InputObject ''
+    write-output -InputObject ' # To enumerate available Custom Modules, run:'
+    write-output -InputObject '   # Get-CustomModule | Format-Table -Property Name, Description'
 
-write-output -InputObject '   # To view additional available modules, run: Get-Module -ListAvailable'
-Write-Output -InputObject '   # To view cmdlets available in a given module, run:'
-Write-Output -InputObject '   #  Get-Command -Module <ModuleName>'
+    write-output -InputObject '   # To view additional available modules, run: Get-Module -ListAvailable'
+    Write-Output -InputObject '   # To view cmdlets available in a given module, run:'
+    Write-Output -InputObject '   #  Get-Command -Module <ModuleName>'
+#>
 
 Write-Output -InputObject ''
 Write-Output -InputObject ' # # PowerShell Environment Bootstrap Complete #'

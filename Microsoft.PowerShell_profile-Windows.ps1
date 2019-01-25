@@ -101,7 +101,11 @@ $git_bin_path = 'R:\IT\Microsoft Tools\VSCode\GitPortable\bin\git.exe'
 if (Test-Path -Path $git_bin_path  -PathType Leaf -IsValid) {
   $Env:GIT_EXEC_PATH = Split-Path -Path $git_bin_path
 } else {
-  Write-Warning -Message ('Test-Path -Path {0} Failed; GIT_EXEC_PATH not set.' -f $git_bin_path)
+  if (Get-Command -Name git.exe) {
+    $git_bin_path = (Get-Command -Name git.exe | Select-Object -Property Source).Source
+  } else {
+    Write-Warning -Message ('Test-Path -Path {0} Failed; GIT_EXEC_PATH not set.' -f $git_bin_path)
+  }
 }
 
 #  Check the current setting by running `git --exec-path`.
@@ -178,6 +182,7 @@ function Get-MyBrowser {
     'IE.HTTP'    = 'Internet Explorer'
     'IE.HTTPS'   = 'Internet Explorer'
   }
+
   $ProgID = (Get-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice' -Name 'ProgID').ProgID
 
   <#
@@ -269,7 +274,7 @@ if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType
   if ($NetInfo) {
     $SiteType = 'Remote'
     # But if SiteName is NOT 'Undefined' (and is therefore defined in NetSiteName.ps1), then we're at a Work site.
-    if (($NetInfo.SiteName) -ne 'Undefined') {
+    if ($NetInfo.SiteName -NotLike 'Private*') {
       $SiteType = 'Work'
     }
     Write-Output -InputObject ('Connected at {0} site: {1} (Address: {2})' -f $SiteType, ($NetInfo.SiteName)[-1], $NetInfo.IPAddress[-1])
@@ -284,14 +289,20 @@ if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType
   . $myPSScriptsPath\Start-XenApp.ps1
 
   Write-Verbose -Message ' # Get-SystemCitrixInfo #'
-  ''
-  '# Running in a Citrix session #'
-  # Confirms $Global:onServer and defines/updates $Global:OnXAHost, and/or fetched Receiver version
-  Get-SystemCitrixInfo | Format-List
+  $CitrixInfo = Get-SystemCitrixInfo
+  if ($CitrixInfo.DisplayName -eq 'N/A') {
+    Write-Verbose -Message 'Not Running in a Citrix session'
+  } else {
+    '# Running in a Citrix session #'
+    # Confirms $Global:onServer and defines/updates $Global:OnXAHost, and/or fetched Receiver version
+    $CitrixInfo | Format-List
+  }
 
-  # dot-source script file containing my XenApp functions
-  Write-Verbose -Message ' # Initializing GBCI-XenApp.ps1 #'
-  . $myPSScriptsPath\GBCI-XenApp.ps1
+  <#
+    # dot-source script file containing my XenApp functions
+    Write-Verbose -Message ' # Initializing GBCI-XenApp.ps1 #'
+    . $myPSScriptsPath\GBCI-XenApp.ps1
+  #>
 } else {
   Write-Warning -Message ('Failed to locate Scripts folder {0}; run any scripts.' -f $myPSScriptsPath)
 }
@@ -343,23 +354,59 @@ function Save-Credential {
 New-Alias -Name rdp -Value Start-RemoteDesktop -ErrorAction Ignore
 New-Alias -Name rename -Value Rename-Item -ErrorAction SilentlyContinue
 
-Write-Verbose -Message ' ... checking status of PSGallery ...'
-# Check PSRepository status
-$PSGallery = Get-PSRepository -Name PSGallery | Select-Object -Property Name,InstallationPolicy
-if ($PSGallery.InstallationPolicy -ne 'Trusted') {
-  Write-Output -InputObject '# Trusting PSGallery Repository #'
-  Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-} else {
-  Get-PSRepository
-}
-Remove-Variable -Name PSGallery
+Write-Verbose -Message ' # Declaring function Get-SpecialFolder #'
+function Get-SpecialFolder {
+  [cmdletbinding()]
+  Param(
+    [Parameter(Position = 0)]
+    [Alias('Name')]
+    [string]
+    $SpecialFolder = [Enum]::GetNames([Environment+SpecialFolder])[2]
+    ,
+    [Parameter(Position = 1)]
+    [switch]
+    $ListAvailable
+  )
 
-if ($IsAdmin) {
-  # try to update PowerShell help files
-  Get-MyNewHelp
+#    [Enum]::GetNames([Environment+SpecialFolder]) | ForEach-Object -Process { Write-Output -InputObject ('Special Folder {0} is at path {1}' -f $PSItem, [Environment]::GetFolderPath($PSItem)) }
+  if ($ListAvailable) {
+    [Enum]::GetNames([Environment+SpecialFolder])
+  } else {
+    return [Environment]::GetFolderPath($SpecialFolder)
+  }
+
+} # End Get-SpecialFolder
+
+
+if ($PSEdition -eq 'Desktop') {
+
+  Write-Verbose -Message ' ... checking status of PSGallery ...'
+  # Check PSRepository status
+  $PSGallery = Get-PSRepository -Name PSGallery | Select-Object -Property Name,InstallationPolicy
+  if ($PSGallery.InstallationPolicy -ne 'Trusted') {
+    Write-Output -InputObject '# Trusting PSGallery Repository #'
+    Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+  } else {
+    Get-PSRepository
+  }
+  Remove-Variable -Name PSGallery
+
+  # Look in PSGallery for available modules to upgrade builtins
+  'Looking for newer available modules'
+  Get-Module | Where-Object -FilterScript {$_.Name -notlike 'Microsoft.*' -and $_.Version -ne '0.0'} | ForEach-Object -Process {Write-Verbose -Message ('{0} ({1})' -f $_.Name, $_.Version); Find-Package -Type Module -Source PSGallery -Name $_.Name -MinimumVersion $_.Version -ErrorAction SilentlyContinue | Select-Object -Property Name, Version, Source }
+
+  if ($IsAdmin) {
+    # try to update PowerShell help files
+    Get-MyNewHelp
+  } else {
+    # Without admin rights (in WIndowsPowerShell), we can't update help
+    ''
+    'Not Admin; unable to update PowerShell help files'
+    ''
+  }
 } else {
-  # Without admin rights (in WIndowsPowerShell), we can't update help
-  'Not Admin; unable to update PowerShell help files'
+  # try to update PowerShell help files in PWSH Core
+  Get-MyNewHelp
 }
 
 # if connected to work network, initiate logging on to work, via Set-Workplace function
@@ -386,8 +433,10 @@ if ($atWork) {
   }
 
 } else {
-  Write-Verbose -Message 'Dismount-Path'
-  Dismount-Path
+  if (Get-Command -Name Dismount-Path -ErrorAction SilentlyContinue) {
+    Write-Verbose -Message 'Dismount-Path'
+    Dismount-Path
+  }
   Write-Output -InputObject ' # # # Work network not detected. Run ''Set-Workplace -Zone Remote'' to switch modes.'
 }
 
@@ -409,26 +458,27 @@ function Install-VSCode {
     $InstallPath = $Env:PSEdit
   )
 
-  $private:VSCodeUserSetup = Join-Path -Path $SourcePath -ChildPath 'VSCodeUserSetup-*.exe' -Resolve
-  $private:VSCodeArgsList  = ('/SP- /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LANG=english /DIR="{0}" /TASKS=addcontextmenufiles,associatewithfiles' -f $InstallPath)
-  Write-Verbose -Message (' - Launching {0} {1}' -f $private:VSCodeUserSetup, $private:VSCodeArgsList)
-  Write-Verbose -Message ('Start-Process -FilePath {0} -ArgumentList {1} -Wait' -f $VSCodeUserSetup, $VSCodeArgsList)
-  Start-Process -FilePath $VSCodeUserSetup -ArgumentList $VSCodeArgsList -Wait
-  # & $VSCodeUserSetup /SP- /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LANG=english /DIR="H:\Programs\VSCode" /TASKS=addcontextmenufiles,associatewithfiles
+  if (Test-Path -Path $SourcePath -PathType Container) {
+    $private:VSCodeUserSetup = Join-Path -Path $SourcePath -ChildPath 'VSCodeUserSetup-*.exe' -Resolve
+    $private:VSCodeArgsList  = ('/SP- /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LANG=english /DIR="{0}" /TASKS=addcontextmenufiles,associatewithfiles' -f $InstallPath)
+    Write-Verbose -Message (' - Launching {0} {1}' -f $private:VSCodeUserSetup, $private:VSCodeArgsList)
+    Write-Verbose -Message ('Start-Process -FilePath {0} -ArgumentList {1} -Wait' -f $VSCodeUserSetup, $VSCodeArgsList)
+    Start-Process -FilePath $VSCodeUserSetup -ArgumentList $VSCodeArgsList -Wait
+    # & $VSCodeUserSetup /SP- /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LANG=english /DIR="H:\Programs\VSCode" /TASKS=addcontextmenufiles,associatewithfiles
+  } else {
+    # Install VSCode via Install-Script
+    # First, check if PackageManagement is up to date to support PowerShellGet v2.0+ / Install-Script cmdlet
 
-  <#
-      # Install VSCode via script?
-      # First, check if PackageManagement is up to date to support  in GBCI citrix image - as of 11/27/2018
+    if ((Get-Module -ListAvailable -Name PackageManagement).Version -lt '1.1.7') {
+      Install-Package -Name PackageManagement -MinimumVersion 1.1.7 -Scope CurrentUser -Force -AllowClobber
+    } else {
+      (Get-Module -ListAvailable -Name PackageManagement).Version
+    }
 
-      if ((Get-Module -Name PackageManagement).Version -lt '1.1.7') {
-      Install-Package -Name PackageManagement -Scope CurrentUser -Force -AllowClobber
-      } else {
-      (Get-Module -Name PackageManagement).Version
-      }
-
-      #Install-Script -Scope CurrentUser -Repository PSGallery -AcceptLicense -Name Install-VSCode -NoPathUpdate
-      #Install-VSCode.ps1 -?
-  #>
+    Import-Module -Name PackageManagement -MinimumVersion 1.1.7
+    Install-Script -Scope CurrentUser -Repository PSGallery -Name Install-VSCode -NoPathUpdate
+    #Install-VSCode.ps1 -?
+  }
 }
 
 $RunCodeSetup = $false
@@ -460,9 +510,12 @@ Remove-Variable -Name RunCodeSetup -ErrorAction SilentlyContinue
 '# [PSEdit] #'
 #requires -module Edit-Module
 if (-not ($Env:PSEdit)) {
-  Assert-PSEdit -Path (Join-Path -Path $VSCodePath -ChildPath 'code.exe')
+  # Assert-PSEdit will throw an error if the -Path it's pointed at doesn't resolve, so we test it first
+  if ((Get-Command -Name Assert-PSEdit -ErrorAction SilentlyContinue) -and (Test-Path -Path (Join-Path -Path $VSCodePath -ChildPath 'code.exe'))) {
+    Assert-PSEdit -Path (Join-Path -Path $VSCodePath -ChildPath 'code.exe')
+  }
 }
-Remove-Variable -Name VSCodePath   -ErrorAction SilentlyContinue
+Remove-Variable -Name VSCodePath -ErrorAction SilentlyContinue
 
 # Write-Output -InputObject '# Pre-log backup #'
 # Write-Output -InputObject ('$VerbosePreference: {0} is {1}' -f $VerbosePreference, $IsVerbose)
