@@ -3,7 +3,8 @@
 # NAME      : Set-MyDNS.ps1
 # LANGUAGE  : Windows PowerShell
 # AUTHOR    : Bryan Dady
-# UPDATED   : 04/04/2019
+# VERSION   : 1.0.1
+# UPDATED   : 04/01/2019 - Add Neustar UltraDNS 'Family Secure' servers to supported list
 # COMMENT   : Set (or reset) the DNS configuration for my local network adapter (e.g. Wi-Fi).
 #             This is intended to make alternating from well-known DNS service providers (like CloudFlare 1.1.1.1, OpenDNS, etc.) and DHCP defaults.
 #========================================
@@ -141,9 +142,11 @@ function Set-MyDNS {
         [String]
         $Name = (Get-NetAdapter | Select-Object -ExpandProperty ifAlias | Sort-Object | Select-Object -First 1),
         [Parameter(Position=1)]
-        [ValidateSet('Custom','Default','DHCP','CloudFlare','OpenDNS','Quad9','Google')]
+        [ValidateSet('Custom','Default','DHCP','CloudFlare','Google','OpenDNS','Quad9','UltraDNS')]
         [String]
-        $DNSprovider
+        $DNSprovider,
+        [switch]
+        $Force
     )
 
     begin {
@@ -166,8 +169,8 @@ function Set-MyDNS {
             Name = 'Custom'
             AddressFamily = 'Both'
             # 74.82.42.42, 1.0.0.1, 8.8.4.4
-            IPv4 = @('74.82.42.42','1.0.0.1')
-            IPv6 = @('2606:4700:4700::1001','2620:119:35::35')
+            IPv4 = @('156.154.71.3', '9.9.9.9')
+            IPv6 = @('2606:4700:4700::1001', '2620:fe::9')
         }
 
         # CloudFlare / https://1.1.1.1/
@@ -176,8 +179,8 @@ function Set-MyDNS {
         $CloudFlareDNS = @{
             Name = 'CloudFlare'
             AddressFamily = 'Both'
-            IPv4 = @('1.1.1.1','1.0.0.1')
-            IPv6 = @('2606:4700:4700::1111','2606:4700:4700::1001')
+            IPv4 = @('1.0.0.1', '1.1.1.1')
+            IPv6 = @('2606:4700:4700::1111', '2606:4700:4700::1001')
         }
 
         # OpenDNS
@@ -187,18 +190,18 @@ function Set-MyDNS {
         $OpenDNS = @{
             Name = 'OpenDNS'
             AddressFamily = 'Both'
-            IPv4 = @('208.67.222.222','208.67.220.220')
-            IPv6 = @('2620:119:35::35','2620:119:53::53')
+            IPv4 = @('208.67.222.222', '208.67.220.220')
+            IPv6 = @('2620:119:35::35', '2620:119:53::53')
         }
 
         # https://www.quad9.net/microsoft/
         # 9.9.9.9 and 149.112.112.112
         # IPv6 = 2620:fe::fe and 2620:fe::9
         $Quad9DNS = @{
-            Name = 'CloudFlare'
+            Name = 'Quad9'
             AddressFamily = 'Both'
-            IPv4 = @('1.1.1.1','1.0.0.1')
-            IPv6 = @('2606:4700:4700::1111','2606:4700:4700::1001')
+            IPv4 = @('9.9.9.9', '149.112.112.112')
+            IPv6 = @('2620:fe::fe', '2620:fe::9')
         }
 
         # https://developers.google.com/speed/public-dns/docs/using
@@ -207,8 +210,19 @@ function Set-MyDNS {
         $GoogleDNS = @{
             Name = 'Google'
             AddressFamily = 'Both'
-            IPv4 = @('8.8.8.8','8.8.4.4')
-            IPv6 = @('2001:4860:4860::8888','2001:4860:4860::8844')
+            IPv4 = @('8.8.4.4', '8.8.8.8')
+            IPv6 = @('2001:4860:4860::8888', '2001:4860:4860::8844')
+        }
+
+        # Neustar UltraRecursive
+        # Family Secure
+        # IPv4: 156.154.70.3, 156.154.71.3
+        # IPv6: 2610:a1:1018::3, 2610:a1:1019::3
+        $UltraDNS = @{
+            Name = 'Ultra'
+            AddressFamily = 'Both'
+            IPv4 = @('156.154.71.3', '156.154.70.3')
+            IPv6 = @('2610:a1:1018::3', '2610:a1:1019::3')
         }
 
     <#
@@ -237,14 +251,17 @@ function Set-MyDNS {
             'CloudFlare' {
                 $PreferredDNS = $CloudFlareDNS
             }
+            'Google' {
+                $PreferredDNS = $GoogleDNS
+            }
             'OpenDNS' {
                 $PreferredDNS = $OpenDNS
             }
             'Quad9' {
                 $PreferredDNS = $Quad9DNS
             }
-            'Google' {
-                $PreferredDNS = $GoogleDNS
+            'UltraDNS' {
+                $PreferredDNS = $UltraDNS
             }
             Default {
                 Write-Warning -Message 'No known DNS provider name specified. Reverting to DHCP.'
@@ -253,8 +270,6 @@ function Set-MyDNS {
                 }
             }
         }
-
-        #$MyNetAdapterParameters = @{}
 
         # Get current state to compare with target state
         if ('Name' -in $PSBoundParameters.Keys) {
@@ -298,16 +313,20 @@ function Set-MyDNS {
 
             switch ($PreferredDNS.AddressFamily) {
                 'Both' {
-                    $DNSServerAddresses = @($PreferredDNS.IPv4 -join ',', $PreferredDNS.IPv6 -join ',')
+                    Write-Verbose -Message 'AddressFamily: Both'
+                    $DNSServerAddresses = $PreferredDNS.IPv4 + $PreferredDNS.IPv6 -join ','
                 }
                 'IPv4' {
+                    Write-Verbose -Message 'AddressFamily: IPv4'
                     $DNSServerAddresses = $PreferredDNS.IPv4 -join ','
                 }
                 'IPv6' {
+                    Write-Verbose -Message 'AddressFamily: IPv6'
                     $DNSServerAddresses = $PreferredDNS.IPv6 -join ','
                 }
                 Default {
-                    $DNSServerAddresses = $PreferredDNS.IPv4
+                    Write-Verbose -Message 'AddressFamily: Default'
+                    $DNSServerAddresses = $PreferredDNS.IPv4 -join ','
                 }
             }
 
@@ -317,7 +336,7 @@ function Set-MyDNS {
             }
         }
 
-        if ($PSCmdlet.ShouldProcess(('network adapter with ifIndex {0}' -f $CurrentMyDNS.ifIndex))) {
+        if ($Force -OR $PSCmdlet.ShouldProcess(('network adapter with ifIndex {0}' -f $CurrentMyDNS.ifIndex))) {
             # Set-DnsClientServerAddress requires elevated privileges / -RunAsAdministrator
             Set-DnsClientServerAddress @DnsClientServerAddressParameters
         }
