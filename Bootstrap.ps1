@@ -56,6 +56,7 @@ Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f
     $properties = [ordered]@{
         'CommandName'        = $MyCommandName
         'CommandPath'        = $MyCommandPath
+        'CommandRoot'        = Split-Path -Path $MyScriptInfo.CommandPath -Parent
         'CommandType'        = $MyCommandType
         'CommandModule'      = $MyCommandModule
         'ModuleName'         = $MyModuleName
@@ -69,21 +70,21 @@ Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f
 
     # Cleanup
     foreach ($var in $properties.Keys) {
-        Remove-Variable -Name ('My{0}' -f $var) -Force
+        Remove-Variable -Name ('My{0}' -f $var) -Force -ErrorAction SilentlyContinue
     }
     Remove-Variable -Name properties
     Remove-Variable -Name var
-
+    
     if ($IsVerbose) {
         Write-Verbose -Message '$MyScriptInfo:'
         $Script:MyScriptInfo
     }
 #End Region
 
-# Added Win10 PS 5.1 Support / Profile/PowerShell files in OneDrive path, including setting $HomePath to $MyScriptInfo.CommandPath, since Bootstrap.ps1 should always be in $myPShome
+# Added Win10 PS 5.1 Support / Profile/PowerShell files in OneDrive path, including setting $HomePath to $MyScriptInfo.CommandPath, since Bootstrap.ps1 should always be in $HomePath
 if ($MyScriptInfo.CommandPath -match 'OneDrive') {
     $InOneDrive = $true
-    Write-Output -InputObject ' # # Initiating PowerShell Environment Bootstrap [OneDrive]#'
+    Write-Output -InputObject ' # # Initiating PowerShell Environment Bootstrap [OneDrive] #'
 } else {
     $InOneDrive = $false
     Write-Output -InputObject ' # # Initiating PowerShell Environment Bootstrap #'
@@ -105,13 +106,16 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
 
     # Detect older versions of PowerShell and add in new automatic variables for cross-platform consistency
     if ([Version]('{0}.{1}' -f $Host.Version.Major, $Host.Version.Minor) -le [Version]'5.1') {
-        $Global:IsWindows = $true
+        $Global:IsWindows = $True
         $Global:IsCoreCLR = $False
         $Global:IsLinux   = $False
         $Global:IsMacOS   = $False
         $Global:IsAdmin   = $False
+        $Global:IsServer  = $False
         if (-not (Get-Variable -Name PSEdition -Scope Global -ErrorAction SilentlyContinue)) {
-            $Global:PSEdition = ''
+            if ($Host.Name -eq 'ConsoleHost') {
+                $Global:PSEdition = 'Desktop'
+            }
         }
     }
 
@@ -121,6 +125,10 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
         $hostOSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property Caption, LastBootUpTime
         $LastBootUpTime = $hostOSInfo.LastBootUpTime # @{Name="Uptime";Expression={((Get-Date)-$_.LastBootUpTime -split '\.')[0]}}
         $hostOSCaption = $hostOSInfo.Caption -replace 'Microsoft ', ''
+        if ($hostOSCaption -like '*Windows Server*') {
+            $Global:IsServer = $true
+        }
+    
         # Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
         $Global:IsAdmin = (([security.principal.windowsprincipal] [security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     }
@@ -134,6 +142,7 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
     }
 
     if (Get-Variable -Name IsMacOS -ValueOnly -ErrorAction SilentlyContinue) {
+        # !RFE: enhance dynamic hostOS and hostOSCaption population and evaluation
         $hostOS = 'macOS'
         $hostOSCaption = $hostOS
         if (-not (Test-Path -LiteralPath Env:ComputerName -ErrorAction SilentlyContinue)) {
@@ -150,40 +159,21 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
     Write-Verbose -Message ('Setting environment HostOS to {0}' -f $hostOS)
     $Env:HostOS = $hostOS
 
-    $Global:onServer = $false
-    $Global:onXAHost = $false
-    if ($hostOSCaption -like '*Windows Server*') {
-        $Global:onServer = $true
-    }
 #End Region HostOS
 
 if ($IsVerbose) { Write-Output -InputObject '' }
 
-#Region myPSHome
-    # Derive full path to user's $HOME and PowerShell folders
-    <#
-        Write-Verbose -Message ('$HOME is: {0}.' -f $HOME)
-        if ($Global:HOME -and (Test-Path -Path $Global:HOME)) {
-            Write-Verbose -Message '   and $HOME is accessible.'
-        } else {
-            # $HOME is NOT set or available, so set it to match $Env:USERPROFILE
-            Write-Output  -InputObject ''
-            Write-Warning -Message ' # Failed to access $HOME; Setting to $MyScriptInfo.CommandPath'
-            Write-Output  -InputObject ''
-            Write-Verbose -Message ('Updating $HOME to {0}.' -f $MyScriptInfo.CommandPath)
-            Set-Variable  -Name HOME -Value (Resolve-Path -Path $MyScriptInfo.CommandPath) -Force
-        }
-    #>
-
-    $myPSHome = Resolve-Path -Path (Split-Path -Path $MyScriptInfo.CommandPath)
-    Write-Debug -Message ('$myPSHome is: {0}.' -f $myPSHome)
+#Region Check $HOME
     # If running from a server / networked context, prefer non-local $HOME path
-    if ($Global:onServer) {
-        Write-Verbose -Message 'Checking if currently running in the SystemDrive'
-        # If so, then we should look for another (better?) option
-    <#
-        if ($Env:SystemDrive -eq $myPSHome.Path.Split('\')[0])) {
-            Write-Warning -Message ('$HOME ''{0}'' is on SystemDrive. Looking for a network HOME path' -f $HOME)
+    if ($IsServer -and (-not $InOneDrive)) {
+        # Derive full path to user's $HOME and PowerShell folders
+        Write-Verbose -Message 'IsServer = True; Checking if $HOME is on the SystemDrive'
+        Write-Debug -Message ('$Home is: {0}.' -f $Home)
+        $HomePath = Resolve-Path -Path $HOME
+        Write-Verbose -Message ('$HomePath is: {0}.' -f $HomePath)
+        # If $HOME is on the SystemDrive, then it's not the right $HOME we're looking for
+        if ($Env:SystemDrive -eq $HomePath.Path.Substring(0,2)) {
+            Write-Warning -Message ('Operating in a Server OS and $HOME ''{0}'' is on SystemDrive. Looking for a network HOME path' -f $HOME)
             # Detect / derive a viable (new) $HOME root, by looking at the HOMEDRIVE, HOMEPATH system variables
             $PreviousErrorActionPreference = $ErrorActionPreference
             $ErrorActionPreference = 'SilentlyContinue'
@@ -201,61 +191,52 @@ if ($IsVerbose) { Write-Output -InputObject '' }
             $ErrorActionPreference = $PreviousErrorActionPreference
             Remove-Variable -Name PreviousErrorActionPreference
         }
-    #>
-    } else {
-        # If running from a desktop / client, prefer local $HOME path
-        if ($MyScriptInfo.CommandPath.Split('\')[0] -eq $myPSHome.Path.Split('\')[0]) {
-            Write-Verbose -Message ('$myPSHome checks out as local: {0}.' -f $myPSHome)
+
+        # Next, (Re-)confirm a viable [My ]Documents subfolder, and update the $HomePath variable for later re-use/reference
+        if (Test-Path -Path (Join-Path -Path $HomePath -ChildPath '*Documents' -Resolve)) {
+            $HomeDocsPath = (Join-Path -Path $HomePath -ChildPath '*Documents' -Resolve)
+            Write-Verbose -Message ('Confirmed $HomePath contains a Documents folder: {0}' -f $HomeDocsPath)
+            if ($HOME -ne $HomePath) {
+                # Update $HOME to match updated $HomePath
+                Write-Verbose -Message ('Updating $HOME to $HomePath: {0}' -f $HomePath)
+                Set-Variable -Name HOME -Value $HomePath -Scope Global -Force -ErrorAction Stop
+            }
         } else {
-            Write-Warning -Message ('$myPSHome is NOT local: {0}.' -f $myPSHome)
-            $myPSHome = Resolve-Path -Path $Env:USERPROFILE
+            Write-Warning -Message 'Failed to confirm a reliable $HOME (user) folder. Consider updating $HOME and trying again.'
+            break
         }
     }
 
-    <#
-        # Update $HOME to the root of $myPSHome
-        Write-Verbose -Message ('Updating $HOME to $HomePath: {0}' -f $HomePath)
-        Set-Variable -Name HOME -Value $HomePath -Force -ErrorAction Stop
+    # if ($IsWindows) {
+    #     # Adjust [My ]Documents ChildPath for PSEdition (Core or Desktop)
+          $myPSHome =$MyScriptInfo.CommandRoot
+    #     $myPSHome = ('{0}\WindowsPowerShell' -f $HomeDocsPath)
+    #     if (($Global:HOME -like "$Env:SystemDrive*") -and ($PSEdition -eq 'Core')) {
+    #         Write-Verbose -Message 'Using local PS Core path: ''PowerShell''.' -Verbose
+    #         $myPSHome = ('{0}\PowerShell' -f $HomeDocsPath)
+    #     }
+    # } else {
+    #     # Setup "MyPS" variables with PowerShell (pwsh) common paths for non-Windows / PS Core host
+    #     # https://docs.microsoft.com/en-us/powershell/scripting/whats-new/what-s-new-in-powershell-core-60
+    #     # The history save path is located at ~/.local/share/powershell/PSReadline/ConsoleHost_history.txt
+    #     # The user module path is located at ~/.local/share/powershell/Modules
+    #     $myPSHome = ('{0}.local/share/powershell' -f '~')
+    #     #Set-Variable -Name HomePath -Value (Join-Path -Path $HOME -ChildPath $ChildPath -Resolve) -Force -Scope Global
+    # }
 
-        # Next, (Re-)confirm a viable [My ]Documents subfolder, and update the $myPSHome variable for later re-use/reference
-        if (Test-Path -Path (Join-Path -Path $HOME -ChildPath '*Documents' -Resolve)) {
-            # Write-Verbose -Message ('Confirmed valid $HomePath: {0}' -f $HomePath)
-            Write-Verbose -Message ('Confirmed valid $HOME Path: {0}' -f $HOME)
-        } else {
-            Write-Warning -Message 'Failed to find a reliable $HOME path. Consider updating $HOME and trying again.'
-            break
-        }
-
-        if ($IsWindows) {
-            # Adjust [My ]Documents ChildPath for PSEdition (Core or Desktop)
-            $MyDocs = (Join-Path -Path $HOME -ChildPath '*Documents' -Resolve)
-            $myPSHome = ('{0}\WindowsPowerShell' -f $MyDocs)
-            if (($Global:HOME -like "$Env:SystemDrive*") -and ($PSEdition -eq 'Core')) {
-                Write-Verbose -Message 'Using local PS Core path: ''PowerShell''.' -Verbose
-                $myPSHome = ('{0}\PowerShell' -f $MyDocs)
-            }
-        } else {
-            # Setup "MyPS" variables with PowerShell (pwsh) common paths for non-Windows / PS Core host
-            # https://docs.microsoft.com/en-us/powershell/scripting/whats-new/what-s-new-in-powershell-core-60
-            # The history save path is located at ~/.local/share/powershell/PSReadline/ConsoleHost_history.txt
-            # The user module path is located at ~/.local/share/powershell/Modules
-            $myPSHome = ('{0}.local/share/powershell' -f '~')
-            #Set-Variable -Name myPSHome -Value (Join-Path -Path $HOME -ChildPath $ChildPath -Resolve) -Force -Scope Global
-        }
-    #>
-
+    # Copy local variable myPSHome to Global scope
     Set-Variable -Name myPSHome -Value $myPSHome -Force -Scope Global
 
+    Write-Verbose -Message ('$myPSHome is {0}' -f $myPSHome)
     if (Get-Variable -Name myPSHome) {
         if (Test-Path -Path $GLOBAL:myPSHome -ErrorAction SilentlyContinue) {
-            Write-Verbose -Message ('$myPSHome is {0}' -f $myPSHome)
             write-output -InputObject ''
             Write-Output -InputObject ('PS .\> {0}' -f (Push-Location -Path $myPSHome -PassThru | Select-Object -Property Path).Path)
             write-output -InputObject ''
         } else {
             Write-Warning -Message 'Failed to establish / locate path to user PowerShell directory. Creating default locations.'
             if (Test-Path -Path $myPSHome -IsValid -ErrorAction Stop) {
-                New-Item -ItemType 'directory' -Path ('{0}' -f $myPSHome)
+                New-Item -ItemType 'Directory' -Path ('{0}' -f $myPSHome) -Confirm
             } else {
                 throw 'Fatal error confirming or setting up PowerShell user root: $myPSHome'
             }
@@ -263,7 +244,7 @@ if ($IsVerbose) { Write-Output -InputObject '' }
     } else {
         throw 'Fatal error: $myPSHome is empty or null'
     }
-    # Remove-Variable -Name MyDocs -ErrorAction SilentlyContinue
+    # Remove-Variable -Name HomeDocsPath -ErrorAction SilentlyContinue
 #End Region
 
 #Region ModulePath
@@ -301,14 +282,14 @@ if ($IsVerbose) { Write-Output -InputObject '' }
         }
     }
 
-    Write-Verbose -Message ('My PS Modules Path: {0}' -f $myPSModulesPath)
+    Write-Verbose -Message ('MyPSModulesPath: {0}' -f $myPSModulesPath)
 
     # Check if $myPSModulesPath is in $Env:PSModulePath, and while we're at it, cleanup $Env:PSModulePath for duplicates
     Write-Debug -Message ('($myPSModulesPath -in @($Env:PSModulePath -split $SplitChar) = {0}' -f ($myPSModulesPath -in @($Env:PSModulePath -split $SplitChar)))
     $EnvPSModulePath = (($Env:PSModulePath.split($SplitChar)).trim('/')).trim('\') | Sort-Object -Unique
     if (($null -ne $myPSModulesPath) -and (-not ($myPSModulesPath -in $EnvPSModulePath))) {
         Write-Verbose -Message ('Adding Modules Path: {0} to $Env:PSModulePath' -f $myPSModulesPath) -Verbose
-        $Env:PSModulePath = $($EnvPSModulePath -join(';')) + $('{0}{1}' -f $SplitChar, $myPSModulesPath)
+        $Env:PSModulePath = $($EnvPSModulePath -join('{0}')) + $('{0}{1}' -f $SplitChar, $myPSModulesPath)
 
         # post-update cleanup
         if (Test-Path -Path (Join-Path -Path $myPSScriptsPath -ChildPath 'Cleanup-ModulePath.ps1') -ErrorAction SilentlyContinue) {
@@ -318,21 +299,6 @@ if ($IsVerbose) { Write-Output -InputObject '' }
     }
     Remove-Variable -Name SplitChar -ErrorAction SilentlyContinue
 #End Region ModulePath
-
-Write-Verbose -Message 'Declaring function Get-CustomModule'
-function Get-CustomModule {
-    return Get-Module -ListAvailable | Where-Object -FilterScript {$PSItem.ModuleType -eq 'Script' -and $PSItem.Author -NotLike 'Microsoft Corporation'}
-}
-
-<#
-    write-output -InputObject ''
-    write-output -InputObject ' # To enumerate available Custom Modules, run:'
-    write-output -InputObject '   # Get-CustomModule | Format-Table -Property Name, Description'
-
-    write-output -InputObject '   # To view additional available modules, run: Get-Module -ListAvailable'
-    Write-Output -InputObject '   # To view cmdlets available in a given module, run:'
-    Write-Output -InputObject '   #  Get-Command -Module <ModuleName>'
-#>
 
 Write-Output -InputObject ''
 Write-Output -InputObject ' # # PowerShell Environment Bootstrap Complete #'
