@@ -142,7 +142,7 @@ function Set-MyDNS {
         [String]
         $Name = (Get-NetAdapter | Select-Object -ExpandProperty ifAlias | Sort-Object | Select-Object -First 1),
         [Parameter(Position=1)]
-        [ValidateSet('Custom','Default','DHCP','CloudFlare','Google','OpenDNS','Quad9','UltraDNS')]
+        [ValidateSet('Charter','Custom','Default','DHCP','CloudFlare','Google','OpenDNS','Quad9','UltraDNS')]
         [String]
         $DNSprovider,
         [switch]
@@ -164,6 +164,15 @@ function Set-MyDNS {
             throw 'insufficient privileges. Start Windows PowerShell by using the Run as Administrator option, and then try running the script again.'
         }
 
+        # Charter Spectrum, as tested to be fasted (using GRC DNS Benchmark 5/8/2019)
+        $CharterDNS = @{
+            Name = 'Charter'
+            AddressFamily = 'IPv4'
+            # 69.146.17.2, 69.146.17.3
+            IPv4 = @('69.146.17.3', '69.146.17.2')
+            #IPv6 = @('2606:4700:4700::1001', '2620:fe::9')
+        }
+        
         # Describe custom objects for describing preferred DNS server configurations
         $CustomDNS = @{
             Name = 'Custom'
@@ -244,6 +253,9 @@ function Set-MyDNS {
                 $PreferredDNS = @{
                     Name = 'DHCP'
                 }
+            }
+            'Charter' {
+                $PreferredDNS = $CharterDNS
             }
             'Custom' {
                 $PreferredDNS = $CustomDNS
