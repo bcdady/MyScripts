@@ -1,59 +1,74 @@
-﻿#Requires -Version 3 -Module CimCmdlets, PSLogger, Sperry
+#Requires -Version 3
+# -Module CimCmdlets, PSLogger, Sperry
 # Enhanced May 2017 to support XenApp 7 and StoreFront
 [cmdletbinding()]
 Param()
 
-#Region MyScriptInfo
-    Write-Verbose -Message '[Start-XenApp] Populating $MyScriptInfo'
-    $Private:MyCommandName        = $MyInvocation.MyCommand.Name
-    $Private:MyCommandPath        = $MyInvocation.MyCommand.Path
-    $Private:MyCommandType        = $MyInvocation.MyCommand.CommandType
-    $Private:MyCommandModule      = $MyInvocation.MyCommand.Module
-    $Private:MyModuleName         = $MyInvocation.MyCommand.ModuleName
-    $Private:MyCommandParameters  = $MyInvocation.MyCommand.Parameters
-    $Private:MyParameterSets      = $MyInvocation.MyCommand.ParameterSets
-    $Private:MyRemotingCapability = $MyInvocation.MyCommand.RemotingCapability
-    $Private:MyVisibility         = $MyInvocation.MyCommand.Visibility
+# Uncomment the following 2 lines for testing profile scripts with Verbose output
+#'$VerbosePreference = ''Continue'''
+#$VerbosePreference = 'Continue'
 
-    if (($null -eq $Private:MyCommandName) -or ($null -eq $Private:MyCommandPath)) {
+Write-Verbose -Message 'Detect -Verbose $VerbosePreference'
+switch ($VerbosePreference) {
+    Stop             { $IsVerbose = $True }
+    Inquire          { $IsVerbose = $True }
+    Continue         { $IsVerbose = $True }
+    SilentlyContinue { $IsVerbose = $False }
+    Default          { if ('Verbose' -in $PSBoundParameters.Keys) {$IsVerbose = $True} else {$IsVerbose = $False} }
+}
+Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f $VerbosePreference, $IsVerbose)
+
+#Region MyScriptInfo
+    Write-Verbose -Message ('[{0}] Populating $MyScriptInfo' -f $MyInvocation.MyCommand.Name)
+    $MyCommandName        = $MyInvocation.MyCommand.Name
+    $MyCommandPath        = $MyInvocation.MyCommand.Path
+    $MyCommandType        = $MyInvocation.MyCommand.CommandType
+    $MyCommandModule      = $MyInvocation.MyCommand.Module
+    $MyModuleName         = $MyInvocation.MyCommand.ModuleName
+    $MyCommandParameters  = $MyInvocation.MyCommand.Parameters
+    $MyParameterSets      = $MyInvocation.MyCommand.ParameterSets
+    $MyRemotingCapability = $MyInvocation.MyCommand.RemotingCapability
+    $MyVisibility         = $MyInvocation.MyCommand.Visibility
+
+    if (($null -eq $MyCommandName) -or ($null -eq $MyCommandPath)) {
         # We didn't get a successful command / script name or path from $MyInvocation, so check with CallStack
         Write-Verbose -Message 'Getting PSCallStack [$CallStack = Get-PSCallStack]'
-        $Private:CallStack      = Get-PSCallStack | Select-Object -First 1
+        $CallStack      = Get-PSCallStack | Select-Object -First 1
         # $CallStack | Select Position, ScriptName, Command | format-list # FunctionName, ScriptLineNumber, Arguments, Location
-        $Private:myScriptName   = $Private:CallStack.ScriptName
-        $Private:myCommand      = $Private:CallStack.Command
-        Write-Verbose -Message "`$ScriptName: $Private:myScriptName"
-        Write-Verbose -Message "`$Command: $Private:myCommand"
+        $myScriptName   = $CallStack.ScriptName
+        $myCommand      = $CallStack.Command
+        Write-Verbose -Message ('$ScriptName: {0}' -f $myScriptName)
+        Write-Verbose -Message ('$Command: {0}' -f $myCommand)
         Write-Verbose -Message 'Assigning previously null MyCommand variables with CallStack values'
-        $Private:MyCommandPath  = $Private:myScriptName
-        $Private:MyCommandName  = $Private:myCommand
+        $MyCommandPath  = $myScriptName
+        $MyCommandName  = $myCommand
     }
 
     #'Optimize New-Object invocation, based on Don Jones' recommendation: https://technet.microsoft.com/en-us/magazine/hh750381.aspx
-    $Private:properties = [ordered]@{
-        'CommandName'        = $Private:MyCommandName
-        'CommandPath'        = $Private:MyCommandPath
-        'CommandType'        = $Private:MyCommandType
-        'CommandModule'      = $Private:MyCommandModule
-        'ModuleName'         = $Private:MyModuleName
-        'CommandParameters'  = $Private:MyCommandParameters.Keys
-        'ParameterSets'      = $Private:MyParameterSets
-        'RemotingCapability' = $Private:MyRemotingCapability
-        'Visibility'         = $Private:MyVisibility
+    $properties = [ordered]@{
+        'CommandName'        = $MyCommandName
+        'CommandPath'        = $MyCommandPath
+        'CommandType'        = $MyCommandType
+        'CommandModule'      = $MyCommandModule
+        'ModuleName'         = $MyModuleName
+        'CommandParameters'  = $MyCommandParameters.Keys
+        'ParameterSets'      = $MyParameterSets
+        'RemotingCapability' = $MyRemotingCapability
+        'Visibility'         = $MyVisibility
     }
-    New-Variable -Name MyScriptInfo -Value (New-Object -TypeName PSObject -Property $Private:properties) -Scope Local -Option AllScope -Force
-    Write-Verbose -Message '[Start-XenApp] $MyScriptInfo populated'
+    $MyScriptInfo = New-Object -TypeName PSObject -Property $properties
+    Write-Verbose -Message ('[{0}] $MyScriptInfo populated' -f $MyInvocation.MyCommand.Name)
 
     # Cleanup
-    foreach ($var in $Private:properties.Keys) {
+    foreach ($var in $properties.Keys) {
         Remove-Variable -Name ('My{0}' -f $var) -Force
     }
+    Remove-Variable -Name properties
+    Remove-Variable -Name var
 
-    $IsVerbose = $false
-    if ('Verbose' -in $PSBoundParameters.Keys) {
-        Write-Verbose -Message 'Output Level is [Verbose]. $MyScriptInfo is:'
-        $IsVerbose = $true
-        $Private:MyScriptInfo
+    if ($IsVerbose) {
+        Write-Verbose -Message '$MyScriptInfo:'
+        $Script:MyScriptInfo
     }
 #End Region
 
@@ -61,7 +76,6 @@ Param()
 Set-Variable -Name CitrixName    -Value $NULL -Scope Script -Option AllScope
 Set-Variable -Name CitrixVersion -Value $NULL -Scope Script -Option AllScope
 Set-Variable -Name ICAClient     -Value $NULL -Scope Script -Option AllScope
-#Set-Variable -Name CitrixVer     -Value $NULL -Scope Script -Option AllScope
 
 Write-Verbose -Message 'Declaring function Start-CitrixSession'
 function Start-CitrixSession {
@@ -69,57 +83,82 @@ function Start-CitrixSession {
     param ()
     Show-Progress -msgAction 'Start' -msgSource $MyInvocation.MyCommand.Name # Log start time stamp
 
-    if ((-not (Get-Variable -Name onServer -Scope Global -ErrorAction SilentlyContinue)) -OR ($NULL -ne $onServer)) {
-        $Global:onServer = $false
-        if ((Get-WmiObject -Class Win32_OperatingSystem -Property Caption).Caption -like '*Windows Server*') {
-            $Global:onServer = $true
+    if ((-not (Get-Variable -Name IsServer -Scope Global -ErrorAction SilentlyContinue)) -OR ($NULL -ne $IsServer)) {
+        $Global:IsServer = $false
+        if ($hostOSCaption -like '*Windows Server*') {
+            $Global:IsServer = $true
         }
     }
 
-    if ((-not (Get-Process -Name Receiver -ErrorAction SilentlyContinue)) -and (-not $Global:onServer)) {
+    if ((-not (Get-Process -Name Receiver -ErrorAction SilentlyContinue)) -and (-not $Global:IsServer)) {
         if (Test-Path -Path "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\*Citrix Receiver.lnk") {
             "Starting Citrix Receiver: ($((Resolve-Path -Path ""$env:ProgramData\Microsoft\Windows\Start Menu\Programs\*Citrix Receiver.lnk"").Path))"
             & (Resolve-Path -Path "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\*Citrix Receiver.lnk").Path
             ' ... '
             Start-Sleep -Seconds 3
+        } else {
+
         }
     } else {
         Write-Log -Message 'Confirmed Citrix Receiver is running.' -Function $MyInvocation.MyCommand.Name
     }
 
     # Check if running on server or in client (Citrix Receiver) context
-    if (-not ($Global:onServer)) {
+    if (-not ($Global:IsServer)) {
         # Confirm Citrix XenApp shortcuts are available, and then launch frequently used apps
         if (test-path -Path "$env:USERPROFILE\Desktop\Assyst.lnk" -PathType Leaf) {
-            Write-Output -InputObject 'Starting Citrix session ("H Drive")'
-            Start-XenApp -Qlaunch 'H Drive'
+            Write-Output -InputObject 'Starting Citrix session (Internet Explorer [on WS2016])'
+            Start-XenApp -Qlaunch 'Internet Explorer 2016'
             Write-Output -InputObject 'Pausing for Citrix (XenApp) session to load ...'
-            Start-Sleep -Seconds 60
-            Write-Output -InputObject 'Starting Skype for Business'
-            Start-XenApp -Qlaunch 'Skype for Business'
+            Start-Sleep -Seconds 80
+            Write-Output -InputObject 'Starting Skype for Business (2016)'
+            Start-XenApp -Qlaunch 'Skype for Business 2016'
             Start-Sleep -Seconds 10
-            Write-Output -InputObject 'Starting Outlook Web Access'
-            Start-XenApp -Qlaunch 'Outlook Web Access'
-            
-            # Write-Output -InputObject 'Starting Firefox (XenApp)'
-            # xa_firefox
+            Write-Output -InputObject 'Starting H Drive (2016)'
+            Start-XenApp -Qlaunch 'H Drive 2016'
+            Start-Sleep -Seconds 10
         } else {
             Write-Log -Message 'Unable to locate XenApp shortcuts. Please check network connectivity to workplace resources and try again.' -Function $MyInvocation.MyCommand.Name -Verbose
         }
     }
 
+    # Before invoking Start-MyXenApps, look for or create a breadcrumb to keep track of when MyXenApps were last started, so as to avoid re-launching duplicate/redundant application windows
     Write-Verbose -Message 'Checking if work apps should be auto-started'
+    $StartNewSession = $false
     $thisHour = (Get-Date -DisplayHint Time).Hour
-    Write-Debug -Message "(-not [bool](Get-ProcessByUser -ProcessName 'outlook.exe'))"
-    if (($thisHour -ge 6) -and ($thisHour -le 18) -and ($Global:onServer) -and (-not [bool](Get-ProcessByUser -ProcessName 'outlook.exe' -ErrorAction Ignore))) {
-        Write-Verbose -Message 'Starting work apps'
-        Write-Output -InputObject 'Start-MyXenApps'
-        Start-MyXenApps
-        Write-Output -InputObject " # Default Printer # : $((Get-Printer -Default | Select-Object -ExpandProperty ShareName).ShareName)"
+    if (($thisHour -ge 6) -and ($thisHour -le 18)) {
+        # current hour is within business hours
+        Write-Verbose -Message ('Current time {0} is within business hours' -f (Get-Date -DisplayHint Time))
+        Write-Verbose -Message ('$Global:IsServer: {0}' -f $Global:IsServer)
+        if ($Global:IsServer) {
+            # Filtering results of Get-Process for those with a non-null Description is easier than my prior WMI approach via Get-ProcessByUser
+            $MyProcessList = Get-Process -Name chrome,excel,firefox,outlook,onenote,word -ErrorAction SilentlyContinue | Where-Object -FilterScript {$null -ne $_.Description} | Select-Object -Property ProcessName,Description -Unique
+
+            Write-Verbose -Message ('MyProcessList is null: {0}' -f ($null -eq $MyProcessList))
+            Write-Verbose -Message ('MyProcessList is empty: {0}' -f [bool](Select-Object -InputObject $MyProcessList -Property Count))
+
+            If ($null -eq $MyProcessList) {
+                $StartNewSession = $true
+            } else {
+                If (-not (Select-Object -InputObject $MyProcessList -Property Count)) {
+                    $StartNewSession = $true
+                }
+            }
+            Write-Verbose -Message ('MyProcessList :: $StartNewSession: {0}' -f $StartNewSession)
+        } else {
+            # if / when NOT runing in a Server (RDS) environment, presume it's safe to (re-)run Start-MyXenApps
+            Write-Verbose -Message ('$StartNewSession: {0}' -f $StartNewSession)
+            $StartNewSession = $true
+        }
     } else {
-        Write-Verbose -Message ('$thisHour: {0}' -f $thisHour)
-        Write-Verbose -Message ('$Global:onServer : {0}' -f $Global:onServer)
-        Write-Verbose -Message "Get-ProcessByUser -ProcessName 'outlook.exe': $([bool](Get-ProcessByUser -ProcessName 'outlook.exe' -ErrorAction Ignore))"
+        Write-Verbose -Message ('Current time {0} is outside business hours' -f (Get-Date -DisplayHint Time))
+    }
+
+    if ($StartNewSession) {
+        Write-Verbose -Message 'Starting work apps'
+        Write-Output -InputObject ' # Start-MyXenApps #'
+        Start-MyXenApps
+        Write-Output -InputObject (' # Default Printer: {0} #' -f (Get-Printer -Default | Select-Object -ExpandProperty ShareName))
     }
 
     Show-Progress -msgAction 'Stop' -msgSource $MyInvocation.MyCommand.Name # Log end time stamp
@@ -128,6 +167,72 @@ function Start-CitrixSession {
 
 Write-Verbose -Message 'Declaring function Get-SystemCitrixInfo'
 function Get-SystemCitrixInfo {
+    [CmdletBinding()]
+    Param ()
+
+    $Private:hostOSName    = 'Unknown'
+    $Private:hostOSCaption = 'Unknown'
+    $HostInfo              = Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object -Property Caption,CSName,LastBootUpTime
+    $hostOSName            = $HostInfo.CSName
+    $hostOSCaption         = $HostInfo.Caption -replace 'Microsoft ', ''
+
+    # These should be handled in $PROFILE, but better safe than sorry
+    if (-not (Get-Variable -Name IsServer -scope Global)) {
+        $Global:IsServer = $false
+        if ($hostOSCaption -like 'Windows Server*') { $Global:IsServer = $true }
+    }
+    if (-not (Get-Variable -Name IsCitrixServer -Scope Global -ErrorAction SilentlyContinue)) { $Global:IsCitrixServer = $false }
+
+    if ((-not (Get-Variable -Name CitrixVersion -ErrorAction SilentlyContinue)) -OR ($NULL -ne $CitrixVersion)) {
+        Write-Verbose -Message ('$CitrixVersion is {0}' -f $CitrixVersion)
+    }
+
+    $Local:CitrixName    = 'N/A'
+    $Local:CitrixVersion = 'N/A'
+    if ($Global:IsServer) {
+        # Check for server based Citrix XenApp package and version
+        Write-Verbose -Message 'Detecting Citrix Server and version'
+
+        #$ErrorActionPreference = 'SilentlyContinue'
+        $Local:XenApp = Get-Process | Where-Object -FilterScript {$_.Product -like '*Citrix*'} -ErrorAction SilentlyContinue | Select-Object -Property Name,Path,Product,ProductVersion | Sort-Object -Property ProductVersion,Name | Select-Object -First 1
+        #$ErrorActionPreference = 'Continue'
+        Write-Verbose -Message ('$Local:XenApp): {0}' -f [bool]$Local:XenApp)
+        if ($null -eq $Local:XenApp) {
+            Write-Verbose -Message 'Citrix Server NOT detected.'
+        } else {
+            $Local:CitrixName    = $Local:XenApp.Product #DisplayName
+            $Local:CitrixVersion = $Local:XenApp.ProductVersion  #DisplayVersion
+            if ($Local:CitrixName -like '*ICA Host*') {
+                $Global:IsCitrixServer = $True
+            }
+            Write-Verbose -Message ('Confirmed Citrix Server {0} is installed.' -f $Local:CitrixName)
+            Write-Verbose -Message ('Confirmed Citrix Server version. $Global:IsCitrixServer: {0}' -f $Global:IsCitrixServer)
+        }
+    } else {
+        # Detect client/local Citrix Receiver version via registry check
+        $Local:Receiver = Get-Process -Name Receiver -ErrorAction SilentlyContinue | Where-Object -FilterScript {$null -ne $PSItem.Path} | Select-Object -Property Name,Path,Product,ProductVersion
+        if ($null -eq $Local:Receiver) {
+            Write-Verbose -Message 'Failed to confirm local Citrix Receiver is running.'
+        } else {
+            Write-Verbose -Message 'Confirmed Citrix Receiver is installed :'
+            Write-Verbose -Message $Local:Receiver | Format-List
+            #Write-Verbose -Message 'Collecting Citrix Receiver Version'
+            $Local:CitrixName    = $Local:Receiver.Product #DisplayName
+            $Local:CitrixVersion = ('{0}.{1}' -f ($Local:Receiver.ProductVersion -as [version]).Major, ($Local:Receiver.ProductVersion -as [version]).Minor)
+        }
+    }
+
+    #'Optimize New-Object invocation, based on Don Jones' recommendation: https://technet.microsoft.com/en-us/magazine/hh750381.aspx
+    $Private:properties  = [ordered]@{
+        'DisplayName'    = $Local:CitrixName
+        'DisplayVersion' = $Local:CitrixVersion
+        'SystemName'     = $Local:hostOSName
+        'SystemType'     = $Local:hostOSCaption
+    }
+
+    $SystemCitrixInfo = New-Object -TypeName PSObject -Property $Private:properties
+    return $SystemCitrixInfo
+
     <#
         .SYNOPSIS
             Enumerate and retrieve essential information about the host system and it's Citrix components
@@ -149,74 +254,8 @@ function Get-SystemCitrixInfo {
                                          Scoping variables as Private ensures they're only used within this script, and not cluttering up Global Variables
             AUTHOR       :  Bryan Dady
     #>
-    [CmdletBinding()]
-    Param ()
 
-    $Private:hostOSName    = 'Unknown'
-    $Private:hostOSCaption = 'Unknown'
-    $HostInfo              = Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object -Property Caption,CSName,LastBootUpTime
-    $hostOSName            = $HostInfo.CSName
-    $hostOSCaption         = $HostInfo.Caption -replace 'Microsoft ', ''
-
-    # These should be handled in $PROFILE, but better safe than sorry
-    if (-not (Get-Variable -Name onServer -scope Global)) { $Global:onServer = $false }
-    if (-not (Get-Variable -Name OnXAHost -scope Global)) { $Global:OnXAHost = $false }
-    
-    if ($hostOSCaption -like 'Windows Server*') { $Global:onServer = $true }
-
-    if ((-not (Get-Variable -Name CitrixVersion -ErrorAction SilentlyContinue)) -OR ($NULL -ne $CitrixVersion)) {
-        Write-Verbose -Message ('$CitrixVersion is {0}' -f $CitrixVersion)
-    }
-
-    if ($Global:onServer) {
-        # Check for server based Citrix XenApp package and version
-        Write-Verbose -Message 'Detecting Citrix Server and version'
-        
-        $ErrorActionPreference = 'SilentlyContinue'
-        #Get-ChildItem -LiteralPath HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall | ForEach-Object -Process {Get-ItemProperty -Path $($PSItem.Name.Replace('HKEY_LOCAL_MACHINE','HKLM:')) | Where-Object -FilterScript {$PSItem.DisplayName -like "*Citrix*" } } | Select-Object -Property DisplayName,DisplayVersion
-        $Local:XenApp = Get-ChildItem -LiteralPath HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall | ForEach-Object -Process {Get-ItemProperty -Path $($PSItem.Name.Replace('HKEY_LOCAL_MACHINE\','HKLM:\')) | Where-Object -FilterScript {$PSItem.DisplayName -like 'Citrix*Virtual Delivery Agent*'} | Select-Object -Property DisplayName,DisplayVersion}
-        $ErrorActionPreference = 'Continue'
-        Write-Verbose -Message ('$Local:XenApp): {0}' -f [bool]$Local:XenApp)
-        if ($Local:XenApp) {
-            $Local:CitrixName    = $Local:XenApp.DisplayName
-            $Local:CitrixVersion = $Local:XenApp.DisplayVersion
-            $Global:OnXAHost = $True
-            Write-Verbose -Message ('Confirmed Citrix Server {0} is installed.' -f $Local:CitrixName)
-            Write-Verbose -Message ('Confirmed Citrix Server version. $Global:OnXAHost: {0}' -f $Global:OnXAHost)
-        } else {
-            $Local:CitrixName    = 'N/A'
-            $Local:CitrixVersion = 'N/A'
-            Write-Verbose -Message 'Citrix Server NOT detected.'
-        }            
-    } else {
-        # Detect client/local Citrix Receiver version via registry check
-        Write-Verbose -Message 'Detecting Citrix Receiver version'
-        $ErrorActionPreference = 'SilentlyContinue'
-        $Local:Receiver = Get-ChildItem -LiteralPath HKCU:\Software\Citrix\Receiver\InstallDetect | ForEach-Object -Process {Get-ItemProperty -Path $($PSItem.Name.Replace('HKEY_CURRENT_USER\','HKCU:\')) | Where-Object -FilterScript {$PSItem.DisplayName -like 'Citrix Receiver*'} | Select-Object -Property DisplayName,DisplayVersion}
-        $Local:Receiver = $Local:Receiver | Sort-Object -Property DisplayVersion -Descending -Unique
-        $ErrorActionPreference = 'Continue'
-        try {
-            $Local:CitrixName    = $Local:Receiver.DisplayName
-            $Local:CitrixVersion = $Local:Receiver.DisplayVersion
-            Write-Verbose -Message 'Confirmed Citrix Receiver is installed :'
-            Write-Verbose -Message $Local:Receiver | Format-List
-            Write-Verbose -Message 'Confirmed Citrix Receiver is installed.'
-        }
-        catch {
-            $Local:CitrixName    = 'N/A'
-            $Local:CitrixVersion = 'N/A'
-            Write-Verbose -Message 'Citrix Server NOT installed.'
-        }            
-    }
-
-    #'Optimize New-Object invocation, based on Don Jones' recommendation: https://technet.microsoft.com/en-us/magazine/hh750381.aspx
-    $Private:properties  = [ordered]@{
-        'DisplayName'    = $Local:CitrixName
-        'DisplayVersion' = $Local:CitrixVersion
-        'SystemName'     = $Local:hostOSName
-        'SystemType'     = $Local:hostOSCaption
-    }
-    <#
+    <# -- Notes --
         More Win32_OperatingSystem Properties
         Status                                    : OK
         Name                                      : Microsoft Windows Server 2012 R2 Datacenter | C:\Windows | \Device\Harddisk2\Partition2
@@ -252,41 +291,10 @@ function Get-SystemCitrixInfo {
         ServicePackMajorVersion                   : 0
         ServicePackMinorVersion                   : 0
     #>
-    $SystemCitrixInfo = New-Object -TypeName PSObject -Property $Private:properties
-    return $SystemCitrixInfo
 }
 
 Write-Verbose -Message 'Declaring function Start-XenApp'
 function Start-XenApp {
-    <#
-        .SYNOPSIS
-            Extension of Sperry module, to simplify invoking Citrix Receiver PNAgent.exe
-        .DESCRIPTION
-            Sets pnagent path string, assigns frequently used arguments to function parameters, including aliases to known /Qlaunch arguments
-        .PARAMETER Qlaunch
-            The Qlaunch parameter references a shortcut name, to be referenced against the known XenApp apps to launch, and then passes to pnagent to be launched by Citrix
-        .PARAMETER Reconnect
-            Requests that PNAgent attempt to reconnect to any existing Citrix XenApp session for the current user
-        .PARAMETER Terminatewait
-            Attempts to close all applications in the current user's Citrix XenApp session, and logoff from that session
-        .PARAMETER ListAvailable
-            Enumerates available XenApp shortcuts that can be passed to -QLaunch
-
-        .EXAMPLE
-            PS C:\> Start-XenApp -Qlaunch rdp
-            Remote Desktop (or mstsc.exe) client, using the rdp alias, which is defined in the $XenApps hashtable
-        .EXAMPLE
-            PS C:\> Start-XenApp -open excel
-            Open Excel, using the -open alias for the -Qlaunch parameter
-        .EXAMPLE
-            PS C:\> Start-XenApp -ListAvailable
-            Enumerate available XenApp shortcuts to launch
-        .NOTES
-            NAME        :  Start-XenApp
-            VERSION     :  1.3
-            LAST UPDATED:  4/9/2015
-            AUTHOR      :  Bryan Dady
-    #>
     [CmdletBinding()]
     Param (
         [Parameter(
@@ -326,11 +334,8 @@ function Start-XenApp {
     Show-Progress -msgAction Start -msgSource $PSCmdlet.MyInvocation.MyCommand.Name
 
     Write-Debug -Message ('$PSBoundParameters: {0}' -f $PSBoundParameters)
-    #Write-Debug -Message $PSBoundParameters
     Write-Debug -Message ('$PSBoundParameters.Keys: {0}' -f $PSBoundParameters.Keys)
-    #Write-Debug -Message $PSBoundParameters.Keys
     Write-Debug -Message ('$PSBoundParameters.Values: {0}' -f $PSBoundParameters.Values)
-    #Write-Debug -Message $PSBoundParameters.Values
 
     if ((-not (Get-Variable -Name CitrixVersion -ErrorAction SilentlyContinue)) -OR ($NULL -ne $CitrixVersion)) {
         Write-Verbose -Message ('$CitrixVersion is {0}' -f $CitrixVersion)
@@ -345,14 +350,14 @@ function Start-XenApp {
     $Private:GoForLaunch = $false
     $Private:XenApps = @{}
 
-    if ($Global:OnXAHost) {
+    if ($Global:IsCitrixServer) {
         Write-Warning -Message "Start-XenApp is designed to run from Citrix Receiver client, not from the session server.`n`tExiting."
     } else {
         if ($CitrixVersion -lt 4.2) {
             # Set XenApp 6 edition PNAgent ICA client
-            Write-Verbose -Message 'Setting $ICAclient to pnagent.exe'
+            Write-Verbose -Message 'Setting $ICA client to pnagent.exe'
             $ICAClient = "${env:ProgramFiles(x86)}\Citrix\ICA Client\pnagent.exe"
-            
+
             if ('Verbose' -in $PSBoundParameters.Keys) {
                 Write-Verbose -Message 'Output Level is [Verbose]. $Global:MySettings:'
                 Get-Variable -Name MySettings -Scope Global | Select-Object -ExpandProperty Value
@@ -384,7 +389,7 @@ function Start-XenApp {
         }
     }
 
-    if (-not ($Global:OnXAHost)) {
+    if (-not ($Global:IsCitrixServer)) {
         # Process arguments
         $Private:Arguments = ''
         if ($Private:XenApps.Keys -contains $Launch) {
@@ -407,20 +412,21 @@ function Start-XenApp {
                 $Private:Arguments = ('-qlaunch "{0}"' -f $Launch)
             }
         }
+
         # For SelfService.exe // These parameters are available only in Receiver 4.2 and later versions.
         # https://support.citrix.com/article/CTX200337
-        <#
+        <# -- Notes --
             SelfService.exe -rmPrograms
             Clean up shortcuts and stub programs for current user.
 
             SelfService.exe -reconnectapps
             Reconnect to any existing sessions the user has. By default happens at launch time and app refresh time.
 
-            SelfService.exe -poll  Contact the server to refresh application details. 
-            SelfService.exe -ipoll  Contact the server to refresh application details as in -poll, but if no authentication context is available, prompt the user for credentials. 
+            SelfService.exe -poll  Contact the server to refresh application details.
+            SelfService.exe -ipoll  Contact the server to refresh application details as in -poll, but if no authentication context is available, prompt the user for credentials.
 
-            SelfService.exe -exit Exit from SelfService.exe. 
-            SelfService.exe -qlaunch "appname" See Note 1. 
+            SelfService.exe -exit Exit from SelfService.exe.
+            SelfService.exe -qlaunch "appname" See Note 1.
             Launch applications.
                 Note: This parameter can be customized with <appname> <argument>. Publish the application with "%*" in command line parameter.   Example: To launch published application named "IE11" opening http://www.citrix.com, use:
             selfservice.exe -qlaunch IE11 http://www.citrix.com
@@ -447,7 +453,7 @@ function Start-XenApp {
         #>
     }
 
-    if (-not ($Global:OnXAHost)) {
+    if (-not ($Global:IsCitrixServer)) {
         if ($PSBoundParameters.ContainsKey('Reconnect')) {
             Write-Verbose -Message '($PSBoundParameters.ContainsKey(''Reconnect''))'
             Write-Verbose -Message ($PSBoundParameters.ContainsKey('Reconnect'))
@@ -469,7 +475,7 @@ function Start-XenApp {
                 Start-Process -FilePath $ICAClient -ArgumentList '-terminate' -PassThru
             }
         } elseif ($PSBoundParameters.ContainsKey('ListAvailable')) {
-            Write-Log -Message 'Enumerating available $XenApps (for -Launch)' -Function $PSCmdlet.MyInvocation.MyCommand.Name -Verbose
+            Write-Log -Message 'Enumerating available $XenApps (for -Launch)' -Function $PSCmdlet.MyInvocation.MyCommand.Name
             $Private:XenApps.Keys | Sort-Object # -Property Name | Format-Table -AutoSize
         } else {
             $Private:GoForLaunch = $true
@@ -479,12 +485,12 @@ function Start-XenApp {
 
     # As long as we have non-0 arguments, run it using Start-Process and arguments list
     if ($Private:GoForLaunch) {
-        if ($Private:Arguments -ne $NULL) {
+        if ($NULL -ne $Private:Arguments) {
             #$Message = "Starting $($Arguments.Replace('/CitrixShortcut: (1) /QLaunch ',''))"
             $Message = ('Starting {0} {1}' -f $ICAClient, $Arguments.Replace('/CitrixShortcut: (1) /QLaunch ',''))
             $Message = ('Starting {0} {1}' -f $ICAClient, $Arguments.Replace('-qlaunch ',''))
             #$Message = "Starting $($Arguments.Replace('-qlaunch ',''))"
-            Write-Log -Message $Message -Function $PSCmdlet.MyInvocation.MyCommand.Name -Verbose
+            Write-Log -Message $Message -Function $PSCmdlet.MyInvocation.MyCommand.Name
             Start-Process -FilePath $ICAClient -ArgumentList "$Private:Arguments"
         } else {
             Write-Log -Message "Unrecognized XenApp shortcut: $XenApp`n`tPlease try again with one of the following:" -Function $PSCmdlet.MyInvocation.MyCommand.Name -Verbose
@@ -493,5 +499,36 @@ function Start-XenApp {
             break
         }
     }
+    Remove-Variable -Name ICAClient -Scope  -ErrorAction SilentlyContinue
     Show-Progress -msgAction Stop -msgSource $PSCmdlet.MyInvocation.MyCommand.Name
+
+    <#
+        .SYNOPSIS
+            Extension of Sperry module, to simplify invoking Citrix Receiver PNAgent.exe
+        .DESCRIPTION
+            Sets pnagent path string, assigns frequently used arguments to function parameters, including aliases to known /QLaunch arguments
+        .PARAMETER QLaunch
+            The QLaunch parameter references a shortcut name, to be referenced against the known XenApp apps to launch, and then passes to pnagent to be launched by Citrix
+        .PARAMETER Reconnect
+            Requests that PNAgent attempt to reconnect to any existing Citrix XenApp session for the current user
+        .PARAMETER Terminatewait
+            Attempts to close all applications in the current user's Citrix XenApp session, and logoff from that session
+        .PARAMETER ListAvailable
+            Enumerates available XenApp shortcuts that can be passed to -QLaunch
+
+        .EXAMPLE
+            PS C:\> Start-XenApp -QLaunch rdp
+            Remote Desktop (or mstsc.exe) client, using the rdp alias, which is defined in the $XenApps hashtable
+        .EXAMPLE
+            PS C:\> Start-XenApp -open excel
+            Open Excel, using the -open alias for the -QLaunch parameter
+        .EXAMPLE
+            PS C:\> Start-XenApp -ListAvailable
+            Enumerate available XenApp shortcuts to launch
+        .NOTES
+            NAME        :  Start-XenApp
+            VERSION     :  1.3
+            LAST UPDATED:  4/9/2015
+            AUTHOR      :  Bryan Dady
+    #>
 }

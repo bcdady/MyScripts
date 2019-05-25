@@ -13,7 +13,7 @@ param ()
 Set-StrictMode -Version latest
 
 #Region MyScriptInfo
-    Write-Verbose -Message '[$PROFILE] Populating $MyScriptInfo'
+    Write-Verbose -Message '[ISE_PROFILE] Populating $MyScriptInfo'
     $script:MyCommandName        = $MyInvocation.MyCommand.Name
     $script:MyCommandPath        = $MyInvocation.MyCommand.Path
     $script:MyCommandType        = $MyInvocation.MyCommand.CommandType
@@ -26,13 +26,13 @@ Set-StrictMode -Version latest
 
     if (($null -eq $script:MyCommandName) -or ($null -eq $script:MyCommandPath)) {
         # We didn't get a successful command / script name or path from $MyInvocation, so check with CallStack
-        Write-Verbose -Message "Getting PSCallStack [`$CallStack = Get-PSCallStack]"
+        Write-Verbose -Message 'Getting PSCallStack [$CallStack = Get-PSCallStack]'
         $CallStack = Get-PSCallStack | Select-Object -First 1
         # $CallStack | Select Position, ScriptName, Command | format-list # FunctionName, ScriptLineNumber, Arguments, Location
         $script:myScriptName = $CallStack.ScriptName
         $script:myCommand = $CallStack.Command
-        Write-Verbose -Message "`$ScriptName: $script:myScriptName"
-        Write-Verbose -Message "`$Command: $script:myCommand"
+        Write-Verbose -Message ('$ScriptName: {0}' -f $script:myScriptName)
+        Write-Verbose -Message ('`$Command: {0}' -f $script:myCommand)
         Write-Verbose -Message 'Assigning previously null MyCommand variables with CallStack values'
         $script:MyCommandPath = $script:myScriptName
         $script:MyCommandName = $script:myCommand
@@ -51,18 +51,18 @@ Set-StrictMode -Version latest
         'Visibility'         = $script:MyVisibility
     }
     $MyScriptInfo = New-Object -TypeName PSObject -Property $properties
-    Write-Verbose -Message '[$PROFILE] $MyScriptInfo populated'
+    Write-Verbose -Message '[ISE_PROFILE] $MyScriptInfo populated'
 #End Region
 
-Write-Output -InputObject (" # Loading PowerShell `$Profile CurrentUserCurrentHost (ISE) from {0} # " -f $MyScriptInfo.CommandPath)
+Write-Output -InputObject (' # Loading PowerShell $Profile CurrentUserCurrentHost (ISE) from {0} #' -f $MyScriptInfo.CommandPath)
 
 # Moved HOME / MyPSHome, Modules, and Scripts variable determination to shared bootstrap.ps1, invoked via profile.ps1
 <#
     if (Test-Path -Path (Join-Path -Path (split-path -Path $MyInvocation.MyCommand.Path) -ChildPath 'bootstrap.ps1')) {
     . (Join-Path -Path (split-path -Path $MyInvocation.MyCommand.Path) -ChildPath 'bootstrap.ps1')
-    if (Get-Variable -Name "myPS*" -ValueOnly -ErrorAction Ignore) {
-        Write-Output -InputObject "My PowerShell Environment"
-        Get-Variable -Name "myPS*" | Format-Table -AutoSize
+    if (Get-Variable -Name 'myPS*' -ValueOnly -ErrorAction Ignore) {
+        Write-Output -InputObject 'My PowerShell Environment'
+        Get-Variable -Name 'myPS*' | Format-Table -AutoSize
     } else {
         throw "Failed to bootstrap: $(Join-Path -Path (split-path -Path $MyInvocation.MyCommand.Path) -ChildPath 'bootstrap.ps1')"
     }
@@ -70,7 +70,7 @@ Write-Output -InputObject (" # Loading PowerShell `$Profile CurrentUserCurrentHo
     throw "Failed to locate profile-prerequisite bootstrap script: $(Join-Path -Path (split-path -Path $MyInvocation.MyCommand.Path) -ChildPath 'bootstrap.ps1')"
     }
 
-    Write-Output -InputObject "PowerShell Execution Policy: "
+    Write-Output -InputObject 'PowerShell Execution Policy:'
     Get-ExecutionPolicy -List | Format-Table -AutoSize
 #>
 
@@ -85,10 +85,12 @@ Import-Module -Name $myPSModulesPath\ShowDscResource\ShowDscResourceModule.psd1 
 
 Start-Sleep -Seconds 1
 Write-Verbose -Message ' # Checking ISESteroids license #'
-if (-not [bool](Get-ChildItem -Path "$env:APPDATA\ISESteroids\License" -Name -Filter ISESteroids_Professional.license -File)) {
-  Write-Warning -Message 'ISESteroids license file not found. Please contact Bryan Dady.'
+if (-not [bool](Get-ChildItem -Path "$env:APPDATA\ISESteroids\License" -Name -Filter 'ISESteroids_Professional.license' -File)) {
+  copy-item -Path R:\IT\repo\DSC\ISESteroids_Professional.license -Destination "$env:APPDATA\ISESteroids\License"
+  #Write-Warning -Message 'ISESteroids license file not found. Please contact Bryan Dady.'
+  #Add-SteroidsLicense -Path R:\IT\repo\DSC\ISESteroids_Professional.license
 }
 
 # ISESteroids
-Write-Verbose -Message ' # loading ISESteroids [Start-Steroids] #'
+Write-Output -InputObject ' # Loading ISESteroids [Start-Steroids] #'
 Start-Steroids

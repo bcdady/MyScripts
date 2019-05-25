@@ -42,6 +42,14 @@ else
     else
         echo 'Homebrew not found.'
     fi
+echo '*** Install PowerShell Core on macOS (via Homebrew) ***'
+echo ''
+echo "Detected Host OS: $product_name ${major_version}.${minor_version}"
+homebrew_version="$(brew --version | grep -o "\d\.\d\.\d")"
+
+# To avoid/workaround decimal comparisons, we assume OSX 10.n and only compare minor versions
+if [ "${minor_version}" -lt "${req_version}" ]; then
+    echo " *** Warning: $product_name ${major_version}.${minor_version} not supported for PowerShell package management via Homebrew Cask ***"
 fi
 echo ''
 sleep 2

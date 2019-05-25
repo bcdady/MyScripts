@@ -12,10 +12,15 @@
     New-ItemProperty . -Name http -Value 2 -Type DWORD
 #>
 
-New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\Domains' -Name 'michaelhyatt.com'
-New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\Domains\michaelhyatt.com' -Name '*'
-New-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\Domains\michaelhyatt.com\*\' -Name http -Value 2 -Type DWORD
+$ZoneMapDomainsPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\Domains'
+if (-not (Test-Path -Path $ZoneMapDomainsPath)) {
+    New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap' -Name 'Domains' -ItemType 'RegistryKey'
+}
 
-New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\Domains' -Name 'infusionsoft.com'
-New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\Domains\infusionsoft.com' -Name 'an136'
-New-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\Domains\infusionsoft.com\an136\' -Name http -Value 2 -Type DWORD
+New-Item -Path $ZoneMapDomainsPath -Name 'michaelhyatt.com'
+New-Item -Path "$ZoneMapDomainsPath\michaelhyatt.com" -Name '*'
+New-ItemProperty -Path "$ZoneMapDomainsPath\michaelhyatt.com\*\" -Name http -Value 2 -Type DWORD
+
+New-Item -Path $ZoneMapDomainsPath -Name 'infusionsoft.com'
+New-Item -Path "$ZoneMapDomainsPath\infusionsoft.com" -Name 'an136'
+New-ItemProperty -Path "$ZoneMapDomainsPath\infusionsoft.com\an136\" -Name http -Value 2 -Type DWORD
