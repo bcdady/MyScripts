@@ -110,7 +110,7 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
         $Global:IsLinux   = $False
         $Global:IsMacOS   = $False
         $Global:IsAdmin   = $False
-        if (-not $PSEdition) {
+        if (-not (Get-Variable -Name PSEdition -Scope Global -ErrorAction SilentlyContinue)) {
             $Global:PSEdition = 'Desktop'
         }
     }
@@ -135,7 +135,7 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
 
     if (Get-Variable -Name IsMacOS -ValueOnly -ErrorAction SilentlyContinue) {
         $hostOS = 'macOS'
-        $hostOSCaption = $hostOS
+        $hostOSCaption = ('OS: {0}, Version: {1}' -f $(sw_vers -productName), $(sw_vers -productVersion)) # $(uname -mnrs)
         if (-not (Test-Path -LiteralPath Env:ComputerName -ErrorAction SilentlyContinue)) {
             $Env:ComputerName = $(hostname)
         }
@@ -150,8 +150,6 @@ Write-Verbose -Message (' ... from {0} #' -f $MyScriptInfo.CommandPath)
     Write-Verbose -Message ('Setting environment HostOS to {0}' -f $hostOS)
     $Env:HostOS = $hostOS
 
-    $Global:onServer = $false
-    $Global:onXAHost = $false
     if ($hostOSCaption -like '*Windows Server*') {
         $Global:onServer = $true
     }

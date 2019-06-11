@@ -93,21 +93,6 @@ $PSDefaultParameterValues = @{
     'New-PSSession:EnableNetworkAccess'   = $true
 }
 
-Write-Verbose -Message ' # Setting GIT_EXEC_PATH #'
-# GIT_EXEC_PATH determines where Git looks for its sub-programs (like git-commit, git-diff, and others).
-
-$git_bin_path = 'R:\IT\Microsoft Tools\VSCode\GitPortable\bin\git.exe'
-
-if (Test-Path -Path $git_bin_path  -PathType Leaf -IsValid) {
-  $Env:GIT_EXEC_PATH = Split-Path -Path $git_bin_path
-} else {
-  Write-Warning -Message ('Test-Path -Path {0} Failed; GIT_EXEC_PATH not set.' -f $git_bin_path)
-}
-
-#  Check the current setting by running `git --exec-path`.
-& git.exe --exec-path
-Remove-Variable -Name git_bin_path
-
 Write-Verbose -Message ' ... checking status of PSGallery ...'
 # Check PSRepository status
 $PSGallery = Get-PSRepository -Name PSGallery | Select-Object -Property Name,InstallationPolicy
@@ -121,43 +106,16 @@ Remove-Variable -Name PSGallery
 
 Write-Debug -Message (' # # # $VerbosePreference: {0} # # #' -f $VerbosePreference)
 Write-Verbose -Message 'Checking that .\scripts\ folder is available'
-#$atWork = $false
+
 if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType Container)) {
-    Write-Verbose -Message 'Loading scripts from .\scripts\ ...'
+    Write-Verbose -Message ('Loading scripts from {0} ...' -f $myPSScriptsPath)
     Write-Output -InputObject ''
-    <#
-        Write-Verbose -Message 'Initializing Set-ConsoleTheme.ps1'
-        . (Join-Path -Path $myScriptsPath -ChildPath 'Set-ConsoleTheme.ps1')
-        Write-Verbose -Message 'Set-ConsoleTheme'
-        Set-ConsoleTheme
 
-    <#
-        # [bool]($NetInfo.IPAddress -match "^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$") -or
-        if (Test-Connection -ComputerName $env:USERDNSDOMAIN -Quiet) {
-            $atWork = $true
-        }
+    Write-Verbose -Message 'Initializing Set-ConsoleTheme.ps1'
+    . (Join-Path -Path $myScriptsPath -ChildPath 'Set-ConsoleTheme.ps1')
+    Write-Verbose -Message 'Set-ConsoleTheme'
+    Set-ConsoleTheme
 
-        Write-Verbose -Message ' ... loading NetSiteName.ps1'
-        # dot-source script file containing Get-NetSite function
-        . $myPSScriptsPath\NetSiteName.ps1
-
-        Write-Verbose -Message '     Getting $NetInfo (IPAddress, SiteName)'
-        # Get network / site info
-        $NetInfo = Get-NetSite | Select-Object -Property IPAddress, SiteName -ErrorAction Stop
-        if ($NetInfo) {
-            $SiteType = 'remote'
-            if ($atWork) {
-                $SiteType = 'work'
-            }
-            Write-Output -InputObject ("Connected at {0} site: $($NetInfo.SiteName) (Address: $($NetInfo.IPAddress))" -f $SiteType)
-        } else {
-            Write-Warning -Message ('Failed to enumerate Network Site Info: {0}' -f $NetInfo)
-        }
-
-        # dot-source script file containing Get-MyNewHelp function
-        Write-Verbose -Message 'Initializing Get-MyNewHelp.ps1'
-        . $myPSScriptsPath\Get-MyNewHelp.ps1
-    #>
 } else {
     Write-Warning -Message ('Failed to locate Scripts folder {0}; run any scripts.' -f $myPSScriptsPath)
 }
@@ -168,15 +126,14 @@ function Save-Credential {
     Param(
         [Parameter(Position = 0)]
         [string]
-        $Variable = 'my2acct'
-        ,
+        $Variable = 'privileged',
         [Parameter(Position = 1)]
         [string]
-        $USERNAME = $(if ($IsWindows) {$env:USERNAME} else {$env:USER})
+        $USERNAME = $(if ($IsWindows) {$Env:USERNAME} else {$Env:USER})
     )
 
     $SaveCredential = $false
-    Write-Verbose -Message ('Starting Save-Credential $Global:onServer = {0}' -f $Global:onServer)
+    Write-Verbose -Message 'Starting Save-Credential'
     $VarValueSet = [bool](Get-Variable -Name $Variable -ValueOnly -ErrorAction SilentlyContinue)
     Write-Verbose -Message ('$VarValueSet = ''{0}''' -f $VarValueSet)
     if ($VarValueSet) {
@@ -190,16 +147,11 @@ function Save-Credential {
 
     Write-Verbose -Message ('$SaveCredential = {0}' -f $SaveCredential)
     if ($SaveCredential) {
-        if ($USERNAME -NotMatch '\d$') {
-            $UName = $($USERNAME + '2')
-        } else {
-            $UName = $USERNAME
-        }
 
         Write-Output -InputObject ''
         Write-Output -InputObject ' # Prompting to capture elevated credentials. #'
         Write-Output -InputObject ' ...'
-        Set-Variable -Name $Variable -Value $(Get-Credential -UserName $UName -Message 'Store admin credentials for convenient use later.') -Scope Global -Description 'Stored admin credentials for convenient re-use.'
+        Set-Variable -Name $Variable -Value $(Get-Credential -UserName $USERNAME -Message 'Store privileged credentials for convenient use later.') -Scope Global -Description 'Stored privileged credentials for convenient re-use.'
         if ($?) {
             Write-Output -InputObject ('Elevated credentials stored in variable: {0}.' -f $Variable)
         }
@@ -208,33 +160,6 @@ function Save-Credential {
 
 New-Alias -Name rename -Value Rename-Item -ErrorAction SilentlyContinue
 
-#Region UpdateHelp
-$UpdateHelp = $false
-Write-Verbose -Message ('$UpdateHelp: {0}' -f $UpdateHelp)
-
-# Try to update PS help files, if we have local admin rights
-# Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
-if (Get-Variable -Name IsAdmin -ErrorAction Ignore) {
-    Write-Verbose -Message ('$IsAdmin: {0}' -f $IsAdmin);
-} else {
-    Write-Verbose -Message '$IsAdmin is not defined. Trying Test-LocalAdmin'
-    if (Get-Command -Name Test-LocalAdmin -ErrorAction Ignore) {
-        $IsAdmin = Test-LocalAdmin;
-    }
-    Write-Verbose -Message ('$IsAdmin: {0}' -f $IsAdmin);
-}
-
-# else ... if not local admin, we don't have permissions to update help files.
-#End Region
-
-Write-Output -InputObject '# [PSEdit] #'
-if (-not($Env:PSEdit)) {
-    if (Test-Path -Path $HOME\vscode\app\code.exe -PathType Leaf) {
-        Assert-PSEdit -Path (Resolve-Path -Path $HOME\vscode\app\code.exe)
-    } else {
-            Assert-PSEdit
-    }
-}
 Write-Output -InputObject ''
 
 # Backup local PowerShell log files
