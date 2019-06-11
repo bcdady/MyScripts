@@ -1,5 +1,5 @@
 #!/usr/local/bin/pwsh
-#Requires -Version 3 -module PSLogger, Edit-Module
+#Requires -Version 3
 #========================================
 # NAME      : Microsoft.PowerShell_profile-Windows.ps1
 # LANGUAGE  : Windows PowerShell
@@ -26,57 +26,57 @@ switch ($VerbosePreference) {
 Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f $VerbosePreference, $IsVerbose)
 
 #Region MyScriptInfo
-Write-Verbose -Message ('[{0}] Populating $MyScriptInfo' -f $MyInvocation.MyCommand.Name)
-$MyCommandName        = $MyInvocation.MyCommand.Name
-$MyCommandPath        = $MyInvocation.MyCommand.Path
-$MyCommandType        = $MyInvocation.MyCommand.CommandType
-$MyCommandModule      = $MyInvocation.MyCommand.Module
-$MyModuleName         = $MyInvocation.MyCommand.ModuleName
-$MyCommandParameters  = $MyInvocation.MyCommand.Parameters
-$MyParameterSets      = $MyInvocation.MyCommand.ParameterSets
-$MyRemotingCapability = $MyInvocation.MyCommand.RemotingCapability
-$MyVisibility         = $MyInvocation.MyCommand.Visibility
+  Write-Verbose -Message ('[{0}] Populating $MyScriptInfo' -f $MyInvocation.MyCommand.Name)
+  $MyCommandName        = $MyInvocation.MyCommand.Name
+  $MyCommandPath        = $MyInvocation.MyCommand.Path
+  $MyCommandType        = $MyInvocation.MyCommand.CommandType
+  $MyCommandModule      = $MyInvocation.MyCommand.Module
+  $MyModuleName         = $MyInvocation.MyCommand.ModuleName
+  $MyCommandParameters  = $MyInvocation.MyCommand.Parameters
+  $MyParameterSets      = $MyInvocation.MyCommand.ParameterSets
+  $MyRemotingCapability = $MyInvocation.MyCommand.RemotingCapability
+  $MyVisibility         = $MyInvocation.MyCommand.Visibility
 
-if (($null -eq $MyCommandName) -or ($null -eq $MyCommandPath)) {
-  # We didn't get a successful command / script name or path from $MyInvocation, so check with CallStack
-  Write-Verbose -Message 'Getting PSCallStack [$CallStack = Get-PSCallStack]'
-  $CallStack      = Get-PSCallStack | Select-Object -First 1
-  # $CallStack | Select Position, ScriptName, Command | format-list # FunctionName, ScriptLineNumber, Arguments, Location
-  $myScriptName   = $CallStack.ScriptName
-  $myCommand      = $CallStack.Command
-  Write-Verbose -Message ('$ScriptName: {0}' -f $myScriptName)
-  Write-Verbose -Message ('$Command: {0}' -f $myCommand)
-  Write-Verbose -Message 'Assigning previously null MyCommand variables with CallStack values'
-  $MyCommandPath  = $myScriptName
-  $MyCommandName  = $myCommand
-}
+  if (($null -eq $MyCommandName) -or ($null -eq $MyCommandPath)) {
+    # We didn't get a successful command / script name or path from $MyInvocation, so check with CallStack
+    Write-Verbose -Message 'Getting PSCallStack [$CallStack = Get-PSCallStack]'
+    $CallStack      = Get-PSCallStack | Select-Object -First 1
+    # $CallStack | Select Position, ScriptName, Command | format-list # FunctionName, ScriptLineNumber, Arguments, Location
+    $myScriptName   = $CallStack.ScriptName
+    $myCommand      = $CallStack.Command
+    Write-Verbose -Message ('$ScriptName: {0}' -f $myScriptName)
+    Write-Verbose -Message ('$Command: {0}' -f $myCommand)
+    Write-Verbose -Message 'Assigning previously null MyCommand variables with CallStack values'
+    $MyCommandPath  = $myScriptName
+    $MyCommandName  = $myCommand
+  }
 
-#'Optimize New-Object invocation, based on Don Jones' recommendation: https://technet.microsoft.com/en-us/magazine/hh750381.aspx
-$properties = [ordered]@{
-  'CommandName'        = $MyCommandName
-  'CommandPath'        = $MyCommandPath
-  'CommandType'        = $MyCommandType
-  'CommandModule'      = $MyCommandModule
-  'ModuleName'         = $MyModuleName
-  'CommandParameters'  = $MyCommandParameters.Keys
-  'ParameterSets'      = $MyParameterSets
-  'RemotingCapability' = $MyRemotingCapability
-  'Visibility'         = $MyVisibility
-}
-$MyScriptInfo = New-Object -TypeName PSObject -Property $properties
-Write-Verbose -Message ('[{0}] $MyScriptInfo populated' -f $MyInvocation.MyCommand.Name)
+  #'Optimize New-Object invocation, based on Don Jones' recommendation: https://technet.microsoft.com/en-us/magazine/hh750381.aspx
+  $properties = [ordered]@{
+    'CommandName'        = $MyCommandName
+    'CommandPath'        = $MyCommandPath
+    'CommandType'        = $MyCommandType
+    'CommandModule'      = $MyCommandModule
+    'ModuleName'         = $MyModuleName
+    'CommandParameters'  = $MyCommandParameters.Keys
+    'ParameterSets'      = $MyParameterSets
+    'RemotingCapability' = $MyRemotingCapability
+    'Visibility'         = $MyVisibility
+  }
+  $MyScriptInfo = New-Object -TypeName PSObject -Property $properties
+  Write-Verbose -Message ('[{0}] $MyScriptInfo populated' -f $MyInvocation.MyCommand.Name)
 
-# Cleanup
-foreach ($var in $properties.Keys) {
-  Remove-Variable -Name ('My{0}' -f $var) -Force
-}
-Remove-Variable -Name properties
-Remove-Variable -Name var
-
-if ($IsVerbose) {
-  Write-Verbose -Message '$MyScriptInfo:'
-  $Script:MyScriptInfo
-}
+  # Cleanup
+  foreach ($var in $properties.Keys) {
+    Remove-Variable -Name ('My{0}' -f $var) -Force
+  }
+  Remove-Variable -Name properties
+  Remove-Variable -Name var
+      
+  if ($IsVerbose) {
+    Write-Verbose -Message '$MyScriptInfo:'
+    $Script:MyScriptInfo
+  }
 #End Region
 
 Write-Output -InputObject ' # Loading PowerShell Windows Profile Script #'
@@ -101,11 +101,17 @@ $git_bin_path = 'R:\IT\Microsoft Tools\VSCode\GitPortable\bin\git.exe'
 if (Test-Path -Path $git_bin_path  -PathType Leaf -IsValid) {
   $Env:GIT_EXEC_PATH = Split-Path -Path $git_bin_path
 } else {
-  Write-Warning -Message ('Test-Path -Path {0} Failed; GIT_EXEC_PATH not set.' -f $git_bin_path)
+  if (Get-Command -Name git.exe) {
+    $git_bin_path = (Get-Command -Name git.exe | Select-Object -Property Source).Source
+  } else {
+    Write-Warning -Message ('Test-Path -Path {0} Failed; GIT_EXEC_PATH not set.' -f $git_bin_path)
+  }
 }
 
 #  Check the current setting by running `git --exec-path`.
-& git.exe --exec-path
+if (Get-Command -Name git -CommandType Application -All -ErrorAction SilentlyContinue) {
+  & git.exe --exec-path
+}
 Remove-Variable -Name git_bin_path
 
 <# Yes! This even works in XenApp!
@@ -117,7 +123,7 @@ Remove-Variable -Name git_bin_path
 
 Write-Verbose -Message 'Declaring function Show-DesktopDocuments'
 function Show-DesktopDocuments {
-  PSLogger\Write-Log -Message 'Opening all Desktop Documents' -Function $MyInvocation.MyCommand.Name
+  Write-Verbose -Message 'Opening all Desktop Documents'
   # Open all desktop PDF files
   Get-ChildItem -Path $Env:USERPROFILE\Desktop\*.pdf | ForEach-Object { & $_ ; Start-Sleep -Milliseconds 400}
   # Open all desktop Word doc files
@@ -163,7 +169,7 @@ function Invoke-WinRestart {
 }
 New-Alias -Name Restart -Value Invoke-WinRestart -ErrorAction Ignore
 
-<#
+<# 
     Printer info
     printmanagement\Get-Printer
     -OR-
@@ -173,13 +179,16 @@ New-Alias -Name Restart -Value Invoke-WinRestart -ErrorAction Ignore
 function Get-MyBrowser {
   # map known Browser ProgIDs to their Windows Control Panel\Programs\Default Programs AppName
   $ProgramByProgID = @{
-    'ChromeHTML' = 'Google Chrome'
-    'FirefoxURL' = 'Firefox'
-    'IE.HTTP'    = 'Internet Explorer'
-    'IE.HTTPS'   = 'Internet Explorer'
+    'ChromeHTML'  = 'Google Chrome'
+    'FirefoxURL'  = 'Firefox'
+    'MSEdgeSSHTM' = 'Microsoft Edge'
+    'IE.HTTP'     = 'Internet Explorer'
+    'IE.HTTPS'    = 'Internet Explorer'
+    'Undefined'   = 'Undefined'
   }
   $ProgID = (Get-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice' -Name 'ProgID').ProgID
 
+  if ($null -eq $ProgID) { $ProgID = 'Undefined' }
   <#
       '$ProgID'
       $ProgID
@@ -187,9 +196,19 @@ function Get-MyBrowser {
       $ProgramByProgID.$ProgID
   #>
 
+  $ProgID -match "^(\w+)\W*"
+  if ($Matches.ContainsKey(1)) {
+    $ProgIDMatch = $Matches[1]
+  } else {
+    Write-Warning -Message ('Unrecognized https UserChoice in registry: {0}' -f $ProgID)
+    $ProgIDMatch = $ProgID
+  }
+
+
+
   $BrowserInfo = @{
-    'UserChoice'  = $ProgID
-    'Browser' = $ProgramByProgID.$ProgID
+    'UserChoice'  = $ProgIDMatch
+    'Browser'     = $ProgramByProgID.$ProgIDMatch
   }
 
   return $BrowserInfo
@@ -269,7 +288,7 @@ if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType
   if ($NetInfo) {
     $SiteType = 'Remote'
     # But if SiteName is NOT 'Undefined' (and is therefore defined in NetSiteName.ps1), then we're at a Work site.
-    if (($NetInfo.SiteName) -ne 'Undefined') {
+    if ($NetInfo.SiteName -NotLike 'Private*') {
       $SiteType = 'Work'
     }
     Write-Output -InputObject ('Connected at {0} site: {1} (Address: {2})' -f $SiteType, ($NetInfo.SiteName)[-1], $NetInfo.IPAddress[-1])
@@ -284,14 +303,20 @@ if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType
   . $myPSScriptsPath\Start-XenApp.ps1
 
   Write-Verbose -Message ' # Get-SystemCitrixInfo #'
-  ''
-  '# Running in a Citrix session #'
-  # Confirms $Global:onServer and defines/updates $Global:OnXAHost, and/or fetched Receiver version
-  Get-SystemCitrixInfo | Format-List
+  $CitrixInfo = Get-SystemCitrixInfo
+  if ($CitrixInfo.DisplayName -eq 'N/A') {
+    Write-Verbose -Message 'Not Running in a Citrix session'
+  } else {
+    '# Running in a Citrix session #'
+    # Confirms $Global:onServer and defines/updates $Global:OnXAHost, and/or fetched Receiver version
+    $CitrixInfo | Format-List
+  }
 
-  # dot-source script file containing my XenApp functions
-  Write-Verbose -Message ' # Initializing GBCI-XenApp.ps1 #'
-  . $myPSScriptsPath\GBCI-XenApp.ps1
+  <#
+    # dot-source script file containing my XenApp functions
+    Write-Verbose -Message ' # Initializing GBCI-XenApp.ps1 #'
+    . $myPSScriptsPath\GBCI-XenApp.ps1
+  #>
 } else {
   Write-Warning -Message ('Failed to locate Scripts folder {0}; run any scripts.' -f $myPSScriptsPath)
 }
@@ -343,23 +368,56 @@ function Save-Credential {
 New-Alias -Name rdp -Value Start-RemoteDesktop -ErrorAction Ignore
 New-Alias -Name rename -Value Rename-Item -ErrorAction SilentlyContinue
 
-Write-Verbose -Message ' ... checking status of PSGallery ...'
-# Check PSRepository status
-$PSGallery = Get-PSRepository -Name PSGallery | Select-Object -Property Name,InstallationPolicy
-if ($PSGallery.InstallationPolicy -ne 'Trusted') {
-  Write-Output -InputObject '# Trusting PSGallery Repository #'
-  Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-} else {
-  Get-PSRepository
-}
-Remove-Variable -Name PSGallery
+Write-Verbose -Message ' # Declaring function Get-SpecialFolder #'
+function Get-SpecialFolder {
+  [cmdletbinding()]
+  Param(
+    [Parameter(Position = 0)]
+    [Alias('Name')]
+    [string]
+    $SpecialFolder = [Enum]::GetNames([Environment+SpecialFolder])[2]
+    ,
+    [Parameter(Position = 1)]
+    [switch]
+    $ListAvailable
+  )
 
-if ($IsAdmin) {
-  # try to update PowerShell help files
-  Get-MyNewHelp
-} else {
-  # Without admin rights (in WIndowsPowerShell), we can't update help
-  'Not Admin; unable to update PowerShell help files'
+#    [Enum]::GetNames([Environment+SpecialFolder]) | ForEach-Object -Process { Write-Output -InputObject ('Special Folder {0} is at path {1}' -f $PSItem, [Environment]::GetFolderPath($PSItem)) }
+  if ($ListAvailable) {
+    [Enum]::GetNames([Environment+SpecialFolder])
+  } else {
+    return [Environment]::GetFolderPath($SpecialFolder)
+  }
+
+} # End Get-SpecialFolder
+
+
+if ($PSEdition -eq 'Desktop') {
+
+  Write-Verbose -Message ' ... checking status of PSGallery ...'
+  # Check PSRepository status
+  $PSGallery = Get-PSRepository -Name PSGallery | Select-Object -Property Name,InstallationPolicy
+  if ($PSGallery.InstallationPolicy -ne 'Trusted') {
+    Write-Output -InputObject '# Trusting PSGallery Repository #'
+    Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+  } else {
+    Get-PSRepository
+  }
+  Remove-Variable -Name PSGallery
+
+  # Look in PSGallery for available modules to upgrade builtins
+  'Looking for newer available modules'
+  Get-Module | Where-Object -FilterScript {$_.Name -notlike 'Microsoft.*' -and $_.Version -ne '0.0'} | ForEach-Object -Process {Write-Verbose -Message ('{0} ({1})' -f $_.Name, $_.Version); Find-Package -Type Module -Source PSGallery -Name $_.Name -MinimumVersion $_.Version -ErrorAction SilentlyContinue | Select-Object -Property Name, Version, Source }
+
+  if ($IsAdmin) {
+    # try to update PowerShell help files
+    Get-MyNewHelp
+  } else {
+    # Without admin rights (in Windows PowerShell Desktop), we can't update help
+    ''
+    'Not Admin; unable to update PowerShell help files'
+    ''
+  }
 }
 
 # if connected to work network, initiate logging on to work, via Set-Workplace function
@@ -386,83 +444,44 @@ if ($atWork) {
   }
 
 } else {
-  Write-Verbose -Message 'Dismount-Path'
-  Dismount-Path
+  if (Get-Command -Name Dismount-Path -ErrorAction SilentlyContinue) {
+    Write-Verbose -Message 'Dismount-Path'
+    Dismount-Path
+  }
   Write-Output -InputObject ' # # # Work network not detected. Run ''Set-Workplace -Zone Remote'' to switch modes.'
 }
 
 # Now we can check if VSCode should be (re-)installed and asserted as PSEdit
-
-function Install-VSCode {
-  [cmdletbinding()]
-  Param(
-    [Parameter(Position = 0)]
-    [ValidateScript({Test-Path -Path $_})]
-    [Alias('Source','Path')]
-    [string]
-    $SourcePath = 'R:\it\Microsoft Tools\VSCode'
-    ,
-    [Parameter(Position = 1)]
-    [ValidateScript({Test-Path -Path (Split-Path -Path $_) -PathType Container})]
-    [Alias('INSTALLDIR','Target','Destination')]
-    [string]
-    $InstallPath = $Env:PSEdit
-  )
-
-  $private:VSCodeUserSetup = Join-Path -Path $SourcePath -ChildPath 'VSCodeUserSetup-*.exe' -Resolve
-  $private:VSCodeArgsList  = ('/SP- /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LANG=english /DIR="{0}" /TASKS=addcontextmenufiles,associatewithfiles' -f $InstallPath)
-  Write-Verbose -Message (' - Launching {0} {1}' -f $private:VSCodeUserSetup, $private:VSCodeArgsList)
-  Write-Verbose -Message ('Start-Process -FilePath {0} -ArgumentList {1} -Wait' -f $VSCodeUserSetup, $VSCodeArgsList)
-  Start-Process -FilePath $VSCodeUserSetup -ArgumentList $VSCodeArgsList -Wait
-  # & $VSCodeUserSetup /SP- /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LANG=english /DIR="H:\Programs\VSCode" /TASKS=addcontextmenufiles,associatewithfiles
-
-  <#
-      # Install VSCode via script?
-      # First, check if PackageManagement is up to date to support  in GBCI citrix image - as of 11/27/2018
-
-      if ((Get-Module -Name PackageManagement).Version -lt '1.1.7') {
-      Install-Package -Name PackageManagement -Scope CurrentUser -Force -AllowClobber
-      } else {
-      (Get-Module -Name PackageManagement).Version
-      }
-
-      #Install-Script -Scope CurrentUser -Repository PSGallery -AcceptLicense -Name Install-VSCode -NoPathUpdate
-      #Install-VSCode.ps1 -?
-  #>
-}
-
 $RunCodeSetup = $false
 # Install VSCode (User edition) if it should be re-installed in a volatile OS context (such as Citrix)
 if (Test-Path -Path HKCU:\SOFTWARE\Classes\VSCode.ps1) {
   Write-Verbose -Message 'VSCode is installed, per VSCode.ps1 FTA'
   $VSCodePath = Split-Path -Path (((Get-Item -Path HKCU:\SOFTWARE\Classes\VSCode.ps1\shell\open\command).GetValue($NULL) -split ' ')[0] -replace '"')
-
+  Write-Verbose -Message ('$VSCodePath is {0}' -f $VSCodePath)
 } else {
-  <#
-    ! Make VS Code the default PowerShell editor?
-    HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Microsoft.PowerShellScript.1\Shell\Edit\Command
-  #>
-
   # VSCode should be (re-)installed for the current user
   $RunCodeSetup = $true
   $VSCodePath = ('{0}Programs\VSCode' -f $HOME)
-  if ($null -ne ($code = get-process -Name code -ErrorAction SilentlyContinue) ) {
-    Write-Warning -Message ('{0} is running. Please close before proceeding with it''s setup' -f $code.Description)
-    Pause
-  }
 }
 
 if ($RunCodeSetup) {
-  Install-VSCode
+  Install-VSCode -InstallPath $VSCodePath
 }
 Remove-Variable -Name RunCodeSetup -ErrorAction SilentlyContinue
 
 '# [PSEdit] #'
 #requires -module Edit-Module
-if (-not ($Env:PSEdit)) {
-  Assert-PSEdit -Path (Join-Path -Path $VSCodePath -ChildPath 'code.exe')
+if (($null -eq $Env:PSEdit) -or ($Env:PSEdit -like "*powershell*")) {
+  # Assert-PSEdit will throw an error if the -Path it's pointed at doesn't resolve, so we test it first
+  if ((Get-Command -Name Assert-PSEdit -ErrorAction SilentlyContinue) -and (Test-Path -Path (Join-Path -Path $VSCodePath -ChildPath 'code.exe'))) {
+    Write-Verbose -Message ('Assert-PSEdit -Path {0}' -f (Join-Path -Path $VSCodePath -ChildPath 'code.exe' -Resolve))
+    Assert-PSEdit -Path (Join-Path -Path $VSCodePath -ChildPath 'code.exe')
+  } else {
+    Write-Verbose -Message 'Assert-PSEdit'
+    Assert-PSEdit
+  }
 }
-Remove-Variable -Name VSCodePath   -ErrorAction SilentlyContinue
+Remove-Variable -Name VSCodePath -ErrorAction SilentlyContinue
 
 # Write-Output -InputObject '# Pre-log backup #'
 # Write-Output -InputObject ('$VerbosePreference: {0} is {1}' -f $VerbosePreference, $IsVerbose)
