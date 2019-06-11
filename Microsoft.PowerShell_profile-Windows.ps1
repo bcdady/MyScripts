@@ -72,7 +72,7 @@ Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f
   }
   Remove-Variable -Name properties
   Remove-Variable -Name var
-      
+
   if ($IsVerbose) {
     Write-Verbose -Message '$MyScriptInfo:'
     $Script:MyScriptInfo
@@ -92,27 +92,6 @@ $PSDefaultParameterValues = @{
   'New-PSSession:Credential'            = $(Get-Variable -Name elevated -ErrorAction SilentlyContinue)
   'New-PSSession:EnableNetworkAccess'   = $true
 }
-
-Write-Verbose -Message ' # Setting GIT_EXEC_PATH #'
-# GIT_EXEC_PATH determines where Git looks for its sub-programs (like git-commit, git-diff, and others).
-
-$git_bin_path = 'R:\IT\Microsoft Tools\VSCode\GitPortable\bin\git.exe'
-
-if (Test-Path -Path $git_bin_path  -PathType Leaf -IsValid) {
-  $Env:GIT_EXEC_PATH = Split-Path -Path $git_bin_path
-} else {
-  if (Get-Command -Name git.exe) {
-    $git_bin_path = (Get-Command -Name git.exe | Select-Object -Property Source).Source
-  } else {
-    Write-Warning -Message ('Test-Path -Path {0} Failed; GIT_EXEC_PATH not set.' -f $git_bin_path)
-  }
-}
-
-#  Check the current setting by running `git --exec-path`.
-if (Get-Command -Name git -CommandType Application -All -ErrorAction SilentlyContinue) {
-  & git.exe --exec-path
-}
-Remove-Variable -Name git_bin_path
 
 <# Yes! This even works in XenApp!
     & Invoke-Expression (New-Object Net.WebClient).DownloadString('http://bit.ly/e0Mw9w')
@@ -169,7 +148,7 @@ function Invoke-WinRestart {
 }
 New-Alias -Name Restart -Value Invoke-WinRestart -ErrorAction Ignore
 
-<# 
+<#
     Printer info
     printmanagement\Get-Printer
     -OR-
@@ -298,25 +277,6 @@ if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType
   Remove-Variable -Name SiteType -ErrorAction SilentlyContinue
   Remove-Variable -Name NetInfo -ErrorAction SilentlyContinue
 
-  # dot-source script file containing Citrix XenApp functions
-  Write-Verbose -Message ' # Initializing Start-XenApp.ps1 #'
-  . $myPSScriptsPath\Start-XenApp.ps1
-
-  Write-Verbose -Message ' # Get-SystemCitrixInfo #'
-  $CitrixInfo = Get-SystemCitrixInfo
-  if ($CitrixInfo.DisplayName -eq 'N/A') {
-    Write-Verbose -Message 'Not Running in a Citrix session'
-  } else {
-    '# Running in a Citrix session #'
-    # Confirms $Global:onServer and defines/updates $Global:OnXAHost, and/or fetched Receiver version
-    $CitrixInfo | Format-List
-  }
-
-  <#
-    # dot-source script file containing my XenApp functions
-    Write-Verbose -Message ' # Initializing GBCI-XenApp.ps1 #'
-    . $myPSScriptsPath\GBCI-XenApp.ps1
-  #>
 } else {
   Write-Warning -Message ('Failed to locate Scripts folder {0}; run any scripts.' -f $myPSScriptsPath)
 }
@@ -367,6 +327,17 @@ function Save-Credential {
 
 New-Alias -Name rdp -Value Start-RemoteDesktop -ErrorAction Ignore
 New-Alias -Name rename -Value Rename-Item -ErrorAction SilentlyContinue
+
+Write-Verbose -Message ' ... checking status of PSGallery ...'
+# Check PSRepository status
+$PSGallery = Get-PSRepository -Name PSGallery | Select-Object -Property Name,InstallationPolicy
+if ($PSGallery.InstallationPolicy -ne 'Trusted') {
+  Write-Output -InputObject '# Trusting PSGallery Repository #'
+  Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+} else {
+  Get-PSRepository
+}
+Remove-Variable -Name PSGallery
 
 Write-Verbose -Message ' # Declaring function Get-SpecialFolder #'
 function Get-SpecialFolder {

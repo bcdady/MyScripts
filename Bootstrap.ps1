@@ -81,7 +81,7 @@ Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f
     }
 #End Region
 
-# Added Win10 PS 5.1 Support / Profile/PowerShell files in OneDrive path, including setting $HomePath to $MyScriptInfo.CommandPath, since Bootstrap.ps1 should always be in $HomePath
+# Added Win10 PS 5.1 Support / Profile/PowerShell files in OneDrive path, including setting $HomePath to $MyScriptInfo.CommandPath, since Bootstrap.ps1 should always be in $myPShome
 if ($MyScriptInfo.CommandPath -match 'OneDrive') {
     $InOneDrive = $true
     Write-Output -InputObject ' # # Initiating PowerShell Environment Bootstrap [OneDrive] #'
@@ -204,36 +204,19 @@ if ($IsVerbose) { Write-Output -InputObject '' }
         }
     }
 
-    # if ($IsWindows) {
-    #     # Adjust [My ]Documents ChildPath for PSEdition (Core or Desktop)
-          $myPSHome =$MyScriptInfo.CommandRoot
-    #     $myPSHome = ('{0}\WindowsPowerShell' -f $HomeDocsPath)
-    #     if (($Global:HOME -like "$Env:SystemDrive*") -and ($PSEdition -eq 'Core')) {
-    #         Write-Verbose -Message 'Using local PS Core path: ''PowerShell''.' -Verbose
-    #         $myPSHome = ('{0}\PowerShell' -f $HomeDocsPath)
-    #     }
-    # } else {
-    #     # Setup "MyPS" variables with PowerShell (pwsh) common paths for non-Windows / PS Core host
-    #     # https://docs.microsoft.com/en-us/powershell/scripting/whats-new/what-s-new-in-powershell-core-60
-    #     # The history save path is located at ~/.local/share/powershell/PSReadline/ConsoleHost_history.txt
-    #     # The user module path is located at ~/.local/share/powershell/Modules
-    #     $myPSHome = ('{0}.local/share/powershell' -f '~')
-    #     #Set-Variable -Name HomePath -Value (Join-Path -Path $HOME -ChildPath $ChildPath -Resolve) -Force -Scope Global
-    # }
-
-    # Copy local variable myPSHome to Global scope
+    $myPSHome = $MyScriptInfo.CommandRoot
     Set-Variable -Name myPSHome -Value $myPSHome -Force -Scope Global
 
-    Write-Verbose -Message ('$myPSHome is {0}' -f $myPSHome)
     if (Get-Variable -Name myPSHome) {
         if (Test-Path -Path $GLOBAL:myPSHome -ErrorAction SilentlyContinue) {
+            Write-Verbose -Message ('$myPSHome is {0}' -f $myPSHome)
             write-output -InputObject ''
             Write-Output -InputObject ('PS .\> {0}' -f (Push-Location -Path $myPSHome -PassThru | Select-Object -Property Path).Path)
             write-output -InputObject ''
         } else {
             Write-Warning -Message 'Failed to establish / locate path to user PowerShell directory. Creating default locations.'
             if (Test-Path -Path $myPSHome -IsValid -ErrorAction Stop) {
-                New-Item -ItemType 'Directory' -Path ('{0}' -f $myPSHome) -Confirm
+                New-Item -ItemType 'directory' -Path ('{0}' -f $myPSHome)
             } else {
                 throw 'Fatal error confirming or setting up PowerShell user root: $myPSHome'
             }
@@ -241,7 +224,6 @@ if ($IsVerbose) { Write-Output -InputObject '' }
     } else {
         throw 'Fatal error: $myPSHome is empty or null'
     }
-    # Remove-Variable -Name HomeDocsPath -ErrorAction SilentlyContinue
 #End Region
 
 #Region ModulePath

@@ -9,7 +9,7 @@
 #========================================
 [CmdletBinding()]
 param ()
-#Set-StrictMode -Version latest
+Set-StrictMode -Version latest
 
 # Uncomment the following 2 lines for testing profile scripts with Verbose output
 #'$VerbosePreference = ''Continue'''
@@ -86,20 +86,24 @@ Write-Verbose -Message (' ... from {0} # ' -f $MyScriptInfo.CommandPath)
 if ($IsVerbose) {Write-Output -InputObject ''}
 Write-Verbose -Message 'Defining custom prompt'
 function prompt {
-    if (-not (Test-Path -Path Variable:\IsAdmin)) {
-        # $IsWindows, if not already provided by pwsh $Host, is set in bootstrap.ps1
-        if ($IsWindows) {
+    # $IsWindows, if not already provided by pwsh $Host, is set in bootstrap.ps1
+    if ($IsWindows) {
+        if (-not (Get-Variable -Name IsAdmin -ValueOnly -ErrorAction SilentlyContinue)) {
             $IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')
-        } else {
-            $IsAdmin = $False
+            if ($IsAdmin) { $AdminPrompt = '[ADMIN]:' } else { $AdminPrompt = '' }
         }
+    } else {
+        if (-not (Get-Variable -Name IsRoot -ValueOnly -ErrorAction SilentlyContinue)) {
+            $IsRoot = ($ENV:USER -eq 'root')
+            if ($IsRoot)  { $AdminPrompt = '[root]:'  } else { $AdminPrompt = '' }
+        }
+        $Env:COMPUTERNAME = (hostname)
     }
-    if ( $IsAdmin ) { $AdminPrompt = '[ADMIN]:' } else { $AdminPrompt = '' }
-    if ( Get-Variable -Name PSDebugContext -ValueOnly -ErrorAction SilentlyContinue) { $DebugPrompt = '[DEBUG]:' } else { $DebugPrompt = '' }
-    if ( Get-Variable -Name PSConsoleFile -ValueOnly -ErrorAction SilentlyContinue)  { $PSCPrompt = "[PSConsoleFile: $PSConsoleFile]" } else { $PSCPrompt = '' }
-    if ( $NestedPromptLevel -ge 1 ) { $PromptLevel = 'PS .\> >' } else { $PromptLevel = 'PS .\>' }
+    if (Get-Variable -Name PSDebugContext -ValueOnly -ErrorAction SilentlyContinue) { $DebugPrompt = '[DEBUG]:' } else { $DebugPrompt = '' }
+    if (Get-Variable -Name PSConsoleFile -ValueOnly -ErrorAction SilentlyContinue)  { $PSCPrompt = "[PSConsoleFile: $PSConsoleFile]" } else { $PSCPrompt = '' }
+    if ($NestedPromptLevel -ge 1) { $PromptLevel = 'PS .\> >' } else { $PromptLevel = 'PS .\>' }
 
-    return "[{0} @ {1}]`n{2}{3}{4}{5}" -f $Env:ComputerName, $pwd.Path, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel
+    return "[{0} @ {1}]`n{2}{3}{4}{5}" -f $Env:COMPUTERNAME, $pwd.Path, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel
 }
 if ($IsVerbose) {Write-Output -InputObject ''}
 
@@ -147,9 +151,11 @@ if (Get-Command -Name Set-ConsoleTitle -ErrorAction SilentlyContinue) {
     if ($IsVerbose) {Write-Output -InputObject ''}
 }
 
-# Display execution policy, for convenience
-Write-Output -InputObject 'PowerShell Execution Policy: '
-Get-ExecutionPolicy -List | Format-Table -AutoSize
+# Display execution policy, for convenience, on Windows only (as ExecutionPolicy is not supported on non-Windows platforms)
+if ($IsWindows) {
+    Write-Output -InputObject 'PowerShell Execution Policy: '
+    Get-ExecutionPolicy -List | Format-Table -AutoSize
+}
 
 Write-Verbose -Message ('$HostOS = ''{0}''' -f $HostOS)
 # Detect host OS and then jump to the OS specific profile sub-script
