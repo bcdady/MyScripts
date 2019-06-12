@@ -1,16 +1,115 @@
-#Requires -Version 3 -PSEdition Desktop
+#Requires -Version 3
+#-PSEdition Desktop
 #========================================
 # NAME      : Set-MyDNS.ps1
 # LANGUAGE  : Windows PowerShell
 # AUTHOR    : Bryan Dady
-# VERSION   : 1.0.1
-# UPDATED   : 04/01/2019 - Add Neustar UltraDNS 'Family Secure' servers to supported list
+# VERSION   : 1.0.2
+# UPDATED   : 06/11/2019 - Make it work in PowerShell Core (7 preview, incl. Linux support)
 # COMMENT   : Set (or reset) the DNS configuration for my local network adapter (e.g. Wi-Fi).
 #             This is intended to make alternating from well-known DNS service providers (like CloudFlare 1.1.1.1, OpenDNS, etc.) and DHCP defaults.
 #========================================
 [CmdletBinding()]
 Param()
-#Set-StrictMode -Version latest
+Set-StrictMode -Version latest
+
+
+Write-Verbose -Message 'Importing function Get-NetInterface'
+function Get-NetInterface {
+    [CmdletBinding()]
+    param ()
+
+    # Enumerate network interfaces, and determine the active/default interface, based on the network interface attached to the default gateway
+    # default via 192.168.0.1 dev wlp2s0 proto dhcp metric 600 
+
+    Write-Verbose -Message 'Getting network connection - Default Gateway'
+    $null = (ip route | grep default) -match 'default via (?<gateway>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) dev (?<interface>\S+) proto (?<proto>\S+) metric (?<metric>\d+)'
+    # PS .\>$Matches
+
+    # Name                           Value
+    # ----                           -----
+    # metric                         600
+    # proto                          dhcp
+    # interface                      wlp2s0
+    # gateway                        192.168.0.1
+    # 0                              default via 192.168.0.1 dev wlp2s0 proto dhcp…
+    $Interface = [ordered]@{
+        Name     = $Matches.interface
+        Gateway  = $Matches.gateway
+        Protocol = $Matches.proto
+    }
+
+    Write-Verbose -Message ('Default Gateway is {0}. The associated network interface {1}' -f $Interface.Gateway, $Interface.Name)
+
+    # Get address info for this default interface
+    Write-Verbose -Message ('Getting additional info for network interface is {0}' -f $Interface.Name)
+    $if_info = (ip address show dev $Interface.Name)
+    <# Sample output:
+        2: wlp2s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1440 qdisc fq_codel state UP group default qlen 1000
+            link/ether c4:8e:8f:f8:e0:cd brd ff:ff:ff:ff:ff:ff
+            inet 192.168.0.182/24 brd 192.168.0.255 scope global dynamic noprefixroute wlp2s0
+                valid_lft 6277sec preferred_lft 6277sec
+            inet6 fe80::40b3:1cd0:f6cf:21ea/64 scope link noprefixroute 
+                valid_lft forever preferred_lft forever
+    #>
+
+    # get interface status
+    $if_info -match "\b(?<InterfaceIndex>\d+): \S+: .+ state (?<state>\S+) group (?<group>\S+)"
+    if ($?) {
+        Write-Verbose -Message ('$Matches: {0}' -f $Matches)
+    } else {
+        Write-Warning -Message 'No Matches'
+    }
+    ''
+    $Interface | Add-Member -Name Index -Value $Matches.InterfaceIndex -MemberType NoteProperty
+    $Interface | Add-Member -Name State -Value $Matches.state -MemberType NoteProperty
+    $Interface | Add-Member -Name Group -Value $Matches.group -MemberType NoteProperty
+
+    # get interface IPv4 address
+    $if_info -match 'inet (?<ip4>\S+)\/'
+    $Interface | Add-Member -Name IPv4 -Value $Matches.ip4 -MemberType NoteProperty
+
+    # get interface IPv6 address
+    $if_info -match 'inet6 (?<ip6>\S+)\/'
+    $Interface | Add-Member -Name IPv6 -Value $Matches.ip6 -MemberType NoteProperty
+
+    return $Interface
+
+}
+
+Write-Verbose -Message 'Importing function Select-Resolver'
+function Select-Resolver {
+    # Select / collect DNS client (resolver) settings from output of systemd-resolve --status
+    [CmdletBinding()]
+    Param (
+        [Parameter(Position=0,  ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [Alias('ifIndex')]
+        [Int]
+        $InterfaceIndex,
+        [Parameter(Position=1,  ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [Alias('ifName')]
+        [Int]
+        $InterfaceName,
+        [ValidateSet('Up','Down')]
+        [String]
+        $Status = 'Up'
+    )
+
+    # match "DNS Servers: (keep all matching IP addresses)"
+    $DNSservers = (systemd-resolve --status) | grep $InterfaceName
+    <# Example output:
+    Link 2 (wlp2s0)
+        Current Scopes: DNS
+        LLMNR setting: yes
+        MulticastDNS setting: no
+        DNSSEC setting: no
+        DNSSEC supported: no
+        DNS Servers: 192.168.0.1
+                     1.0.0.1
+                     1.1.1.1
+    #>
+
+}
 
 Write-Verbose -Message 'Importing function Get-MyDNS'
 function Get-MyDNS {
@@ -56,7 +155,7 @@ function Get-MyDNS {
         $ParameterAlias = New-Object System.Management.Automation.AliasAttribute -ArgumentList ('InterfaceAlias','ifAlias')
         $AttributeCollection.Add($ParameterAlias)
 
-        # Set the ValidateSet attribute
+        # Set the ValidateSet attribute -- how do we make this work in Linux/macOS, since they?
         $NetAdapterNameSet = Get-NetAdapter | Select-Object -ExpandProperty Name
         $AttributeCollection.Add((New-Object System.Management.Automation.ValidateSetAttribute($NetAdapterNameSet)))
 
@@ -108,7 +207,7 @@ function Get-MyDNS {
         Write-Verbose -Message ('Getting DNS Server/Resolver address(es) for active network adapter {0} (InterfaceIndex {1})' -f $ActiveAdapter.ifAlias, $ActiveAdapter.ifIndex)
 
         $CurrentDNS = Get-DnsClientServerAddress -InterfaceIndex $ActiveAdapter.ifIndex -ErrorAction Stop
-        # It seems the DnsClientServerAddress AddressFamily property is programatically an integer, although the cmdlet displays a string
+        # It seems the DnsClientServerAddress AddressFamily property is programmatically an integer, although the cmdlet displays a string
         # IPv4 = 2; IPv6 = 23
         $IPv4DNS = $CurrentDNS | where-object -FilterScript {$_.AddressFamily -eq '2'}
         $IPv6DNS = $CurrentDNS | where-object -FilterScript {$_.AddressFamily -eq '23'}
@@ -153,11 +252,17 @@ function Set-MyDNS {
 
         # Set-DnsClientServerAddress requires elevated privileges; let's see if we've got them
 
-        function Test-LocalAdmin {
-            Return ([security.principal.windowsprincipal][security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator')
+        function Test-Privilege {
+            # Returns $True if elevated (admin / root) privileges are detected
+            if ($IsWindows) {
+                Return ([security.principal.windowsprincipal][security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator')
+            } else {
+
+            }
+
         }
 
-        if (Test-LocalAdmin) {
+        if (Test-Privilege) {
             Write-Verbose -Message 'Current user has Administrator permissions; ok to proceed.'
         } else {
             Write-Warning -Message 'Current user does NOT have the Administrator permissions required to proceed.'
