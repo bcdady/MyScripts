@@ -9,7 +9,6 @@
 #========================================
 [CmdletBinding()]
 param ()
-#Set-StrictMode -Version latest
 
 # Uncomment the following 2 lines for testing profile scripts with Verbose output
 #'$VerbosePreference = ''Continue'''
@@ -55,6 +54,7 @@ Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f
     $properties = [ordered]@{
         'CommandName'        = $MyCommandName
         'CommandPath'        = $MyCommandPath
+        'CommandRoot'        = Split-Path -Path $MyCommandPath -Parent
         'CommandType'        = $MyCommandType
         'CommandModule'      = $MyCommandModule
         'ModuleName'         = $MyModuleName
@@ -63,12 +63,12 @@ Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f
         'RemotingCapability' = $MyRemotingCapability
         'Visibility'         = $MyVisibility
     }
-    $MyScriptInfo = New-Object -TypeName PSObject -Property $properties
+    $MyScriptInfo = New-Object -TypeName PSObject -Property $properties -ErrorAction SilentlyContinue
     Write-Verbose -Message ('[{0}] $MyScriptInfo populated' -f $MyInvocation.MyCommand.Name)
 
     # Cleanup
     foreach ($var in $properties.Keys) {
-        Remove-Variable -Name ('My{0}' -f $var) -Force
+        Remove-Variable -Name ('My{0}' -f $var) -Force -ErrorAction SilentlyContinue
     }
     Remove-Variable -Name properties
     Remove-Variable -Name var
@@ -79,58 +79,60 @@ Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f
     }
 #End Region
 
-Write-Output -InputObject ' # Loading PowerShell $Profile CurrentUserCurrentHost #'
-Write-Verbose -Message (' ... from {0} # ' -f $MyScriptInfo.CommandPath)
+# capture starting path so we can go back after other things below might move around
+$startingPath = $PWD.Path
+
+Write-Output -InputObject ' # Loading PowerShell $Profile: CurrentUserCurrentHost'
+
+# Display PowerShell Execution Policy -- on Windows only (as ExecutionPolicy is not supported on non-Windows platforms)
+if ($IsWindows) {
+    Write-Output -InputObject 'Current PS execution policy is:'
+    Get-ExecutionPolicy -List
+}
+
+Push-Location -Path $MyScriptInfo.CommandRoot -PassThru
 
 # https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_prompts
-if ($IsVerbose) {Write-Output -InputObject ''}
-Write-Verbose -Message 'Defining custom prompt'
 function prompt {
-    if (-not (Test-Path -Path Variable:\IsAdmin)) {
-        # $IsWindows, if not already provided by pwsh $Host, is set in bootstrap.ps1
-        if ($IsWindows) {
+    if ($IsWindows) {
+        if (-not (Get-Variable -Name IsAdmin -ValueOnly -ErrorAction Ignore)) {
             $IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')
-        } else {
-            $IsAdmin = $False
+            if ($IsAdmin) { $AdminPrompt = '[ADMIN]:' } else { $AdminPrompt = '' }
         }
-    }
-    if ( $IsAdmin ) { $AdminPrompt = '[ADMIN]:' } else { $AdminPrompt = '' }
-    if ( Get-Variable -Name PSDebugContext -ValueOnly -ErrorAction SilentlyContinue) { $DebugPrompt = '[DEBUG]:' } else { $DebugPrompt = '' }
-    if ( Get-Variable -Name PSConsoleFile -ValueOnly -ErrorAction SilentlyContinue)  { $PSCPrompt = "[PSConsoleFile: $PSConsoleFile]" } else { $PSCPrompt = '' }
-    if ( $NestedPromptLevel -ge 1 ) { $PromptLevel = 'PS .\> >' } else { $PromptLevel = 'PS .\>' }
-
-    return "[{0} @ {1}]`n{2}{3}{4}{5}" -f $Env:ComputerName, $pwd.Path, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel
-}
-if ($IsVerbose) {Write-Output -InputObject ''}
-
-#Region Bootstrap
-    # Moved HOME / MyPSHome, Modules, and Scripts variable determination to bootstrap script
-    Write-Verbose -Message ('(Get-Variable -Name ''myPSHome'' -ErrorAction SilentlyContinue) // Already bootstrapped? = ''{0}''' -f [bool](Get-Variable -Name 'myPSHome' -ErrorAction SilentlyContinue))
-    Write-Verbose -Message ('(Split-Path -Path $MyScriptInfo.CommandPath) = ''{0}''' -f (Split-Path -Path $MyScriptInfo.CommandPath))
-    Write-Verbose -Message ('(Test-Path -Path (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath ''bootstrap.ps1'') = ''{0}''' -f (Test-Path -Path (Join-Path -Path(Split-Path -Path $MyScriptInfo.CommandPath) -ChildPath 'bootstrap.ps1')))
-
-    if (Get-Variable -Name 'myPSHome' -ErrorAction SilentlyContinue) {
-        if ($IsVerbose) {Write-Output -InputObject ''}
-        Write-Verbose -Message 'This PS Session was previously bootstrapped'
     } else {
-        # Load/invoke bootstrap
-        if (Test-Path -Path (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'bootstrap.ps1')) {
-            . (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'bootstrap.ps1')
-
-            if (Get-Variable -Name 'myPS*' -ValueOnly -ErrorAction SilentlyContinue) {
-                Write-Output -InputObject ''
-                Write-Output -InputObject 'My PowerShell Environment:'
-                Get-Variable -Name 'myPS*' | Format-Table
-            } else {
-                if ($IsVerbose) {Write-Output -InputObject ''}
-                Write-Warning -Message ' # !! Failed to verify My PowerShell Environment was initialized by bootstrap script. !! #'
-                throw ('Failed to bootstrap: {0}\bootstrap.ps1' -f (Split-Path -Path $MyScriptInfo.CommandPath))
-            }
-        } else {
-            if ($IsVerbose) {Write-Output -InputObject ''}
-            Write-Warning -Message ' # !! Expected PowerShell Environment bootstrap script was not found. !! #'
-            throw ('Failed to bootstrap: {0}\bootstrap.ps1' -f (Split-Path -Path $MyScriptInfo.CommandPath))
+        if (-not (Get-Variable -Name IsRoot -ValueOnly -ErrorAction Ignore)) {
+            $IsRoot = ($ENV:USER -eq 'root')
+            if ($IsRoot)  { $AdminPrompt = '[root]:'  } else { $AdminPrompt = '' }
         }
+        $Env:COMPUTERNAME = (hostname)
+    }
+    if (Get-Variable -Name PSDebugContext -ValueOnly -ErrorAction Ignore) { $DebugPrompt = '[DEBUG]:' } else { $DebugPrompt = '' }
+    if (Get-Variable -Name PSConsoleFile -ValueOnly -ErrorAction Ignore)  { $PSCPrompt = "[PSConsoleFile: $PSConsoleFile]" } else { $PSCPrompt = '' }
+    if($NestedPromptLevel -ge 1) { $PromptLevel = 'PS .\> >' } else { $PromptLevel = 'PS .\>' }
+
+    return "[{0} @ {1}]`n{2}{3}{4}{5}" -f $Env:COMPUTERNAME, $PWD.Path, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel
+}
+
+# Invoke Bootstrap.ps1, from the same root path as this $PROFILE script
+if (Get-Variable -Name 'myPS*' -ValueOnly -ErrorAction SilentlyContinue) {
+    # PowerShell path variables have been initialized via a recent invocation of bootstrap.ps1
+    Write-Output -InputObject ''
+    Write-Output -InputObject 'My PowerShell paths:'
+    Get-Variable -Name 'myPS*' | Format-Table -AutoSize
+} else {
+    # initialize variables, via bootstrap.ps1
+    Write-Verbose -Message ('(Test-Path -Path ./bootstrap.ps1): {0}' -f (Test-Path -Path ./Bootstrap.ps1))
+    if (Test-Path -Path ./Bootstrap.ps1) {
+        #Write-Verbose -Message '. ./Bootstrap.ps1'
+        . ./Bootstrap.ps1
+    }
+    if (Get-Variable -Name 'myPS*' -ValueOnly -ErrorAction SilentlyContinue) {
+        # PowerShell path variables have been initialized via a recent invocation of bootstrap.ps1
+        Write-Output -InputObject ''
+        Write-Output -InputObject 'My PowerShell paths:'
+        Get-Variable -Name 'myPS*' | Format-Table -AutoSize
+    } else {
+        Write-Warning -Message './Bootstrap.ps1 may have encountered errors.'
     }
 #End Region
 
@@ -147,26 +149,25 @@ if (Get-Command -Name Set-ConsoleTitle -ErrorAction SilentlyContinue) {
     if ($IsVerbose) {Write-Output -InputObject ''}
 }
 
-# Display execution policy, for convenience
-Write-Output -InputObject 'PowerShell Execution Policy: '
-Get-ExecutionPolicy -List | Format-Table -AutoSize
+# In case any intermediary scripts or module loads change our current directory, restore original path, before it's locked into the window title by Set-ConsoleTitle
+Set-Location $startingPath
 
-Write-Verbose -Message ('$HostOS = ''{0}''' -f $HostOS)
-# Detect host OS and then jump to the OS specific profile sub-script
-if ($IsLinux) {
-    $Private:SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-Linux.ps1')
+# Loading ProfilePal Module, and only if successful, call Set-ConsoleTitle to customize the ConsoleHost window title
+Import-Module -Name ProfilePal
+if ($?) {
+    # Call Set-ConsoleTitle function from ProfilePal module
+    Set-ConsoleTitle
 }
 
-if ($IsMacOS) {
-    $Private:SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-macOS.ps1')
-}
+# Here's an example of how convenient aliases can be added to your PS profile
+New-Alias -Name rdp -Value Start-RemoteDesktop -ErrorAction Ignore
 
-if ($IsWindows) {
-    $Private:SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-Windows.ps1')
-}
+Write-Output -InputObject ''
+Write-Output -InputObject ' ** To view additional available modules, run: Get-Module -ListAvailable'
+Write-Output -InputObject ' ** To view cmdlets available in a given module, run: Get-Command -Module <ModuleName>'
 
-if ($IsVerbose) {Write-Output -InputObject ''}
-Write-Verbose -Message ('$SubProfile = ''{0}''' -f $Private:SubProfile)
+# Do you like easter eggs?:
+#& iex (New-Object Net.WebClient).DownloadString('http://bit.ly/e0Mw9w')
 
 # Load/invoke OS specific profile sub-script
 if (Test-Path -Path $SubProfile) {
