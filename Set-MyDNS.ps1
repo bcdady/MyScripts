@@ -38,18 +38,12 @@ function Get-NetInterface {
         Gateway  = $Matches.gateway
         Protocol = $Matches.proto
     }
-    '$Interface:'
-    $Interface
-    ''
-
-    'clear $Matches'
-    Clear-Variable -Name Matches
 
     Write-Verbose -Message ('Default Gateway is {0}. The associated network interface is {1}' -f $Interface.Gateway, $Interface.Name)
 
     # Get address info for this default interface
     Write-Verbose -Message ('Getting additional info for network interface {0}' -f $Interface.Name)
-    $if_info = (ip address show dev $Interface.Name)
+    [string]$if_info = (ip address show dev $Interface.Name)
     <# Sample output:
         2: wlp2s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1440 qdisc fq_codel state UP group default qlen 1000
             link/ether c4:8e:8f:f8:e0:cd brd ff:ff:ff:ff:ff:ff
@@ -59,44 +53,30 @@ function Get-NetInterface {
                 valid_lft forever preferred_lft forever
     #>
 
-    # get interface status
-    '$if_info is:'
-    $if_info
-    ''
-    'match 1:'
-    $if_info -match "\b(?<InterfaceIndex>\d+): \S+: .+ state (?<state>\S+) group (?<group>\S+)"
-    if ($? -and ($Matches.Count -ge 3)) {
-        '$Matches:'
-        $Matches
-    } else {
-        Write-Warning -Message 'No Matches'
-    }
-    ''
+    # get interface status, silently
+    $null = $if_info -match "\b(?<InterfaceIndex>\d+): \S+: .+ state (?<state>\S+) group (?<group>\S+)"
+    # if ($? -and ($Matches.Count -ge 3)) {
+    #     '$Matches:'
+    #     $Matches
+    # } else {
+    #     Write-Warning -Message 'No Matches'
+    # }
 
-    'add-member Group'
+    # Add new key/value pairs, silently
     $Interface.Add('Group',$Matches.group)
-    'add-member State'
     $Interface.Add('State',$Matches.state)
-
-    'add-member Index'
     $Interface.Add('Index',$Matches.InterfaceIndex)
 
     # get interface IPv4 address
-    'match 2'
-    $if_info -match 'inet (?<ip4>\S+)\/'
-    'add-member IPv4'
+    $null = $if_info -match 'inet (?<ip4>\S+)\/'
     $Interface.Add('IPv4',$Matches.ip4)
-    $Interface | Add-Member -Name IPv4 -Value $Matches.ip4 -MemberType NoteProperty
 
     # get interface IPv6 address
-    'match 3'
-    $if_info -match 'inet6 (?<ip6>\S+)\/'
-    'add-member IPv6'
+    $null = $if_info -match 'inet6 (?<ip6>\S+)\/'
     $Interface.Add('IPv6',$Matches.ip6)
 
-    'return'
-    return $Interface
-
+    # return interface values in PSObject format
+    return New-Object -TypeName PSObject -Property $Interface
 }
 
 Write-Verbose -Message 'Importing function Select-Resolver'
