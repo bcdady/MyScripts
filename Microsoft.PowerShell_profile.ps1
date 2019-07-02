@@ -1,4 +1,4 @@
-#!/usr/local/bin/pwsh
+#!pwsh
 #Requires -Version 3
 #========================================
 # NAME      : Microsoft.PowerShell_profile.ps1
@@ -82,7 +82,8 @@ Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f
 # capture starting path so we can go back after other things below might move around
 $startingPath = $PWD.Path
 
-Write-Output -InputObject ' # Loading PowerShell $Profile: CurrentUserCurrentHost'
+Write-Output -InputObject ' # Loading PowerShell $Profile: CurrentUserCurrentHost #'
+Write-Verbose -Message (' ... from {0} # ' -f $MyScriptInfo.CommandPath)
 
 # Display PowerShell Execution Policy -- on Windows only (as ExecutionPolicy is not supported on non-Windows platforms)
 if ($IsWindows) {
@@ -93,22 +94,25 @@ if ($IsWindows) {
 Push-Location -Path $MyScriptInfo.CommandRoot -PassThru
 
 # https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_prompts
+if ($IsVerbose) {Write-Output -InputObject ''}
+Write-Verbose -Message 'Defining custom prompt'
 function prompt {
+    # $IsWindows, if not already provided by pwsh $Host, is set in bootstrap.ps1
     if ($IsWindows) {
-        if (-not (Get-Variable -Name IsAdmin -ValueOnly -ErrorAction Ignore)) {
+        if (-not (Get-Variable -Name IsAdmin -ValueOnly -ErrorAction SilentlyContinue)) {
             $IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')
             if ($IsAdmin) { $AdminPrompt = '[ADMIN]:' } else { $AdminPrompt = '' }
         }
     } else {
-        if (-not (Get-Variable -Name IsRoot -ValueOnly -ErrorAction Ignore)) {
+        if (-not (Get-Variable -Name IsRoot -ValueOnly -ErrorAction SilentlyContinue)) {
             $IsRoot = ($ENV:USER -eq 'root')
             if ($IsRoot)  { $AdminPrompt = '[root]:'  } else { $AdminPrompt = '' }
         }
         $Env:COMPUTERNAME = (hostname)
     }
-    if (Get-Variable -Name PSDebugContext -ValueOnly -ErrorAction Ignore) { $DebugPrompt = '[DEBUG]:' } else { $DebugPrompt = '' }
-    if (Get-Variable -Name PSConsoleFile -ValueOnly -ErrorAction Ignore)  { $PSCPrompt = "[PSConsoleFile: $PSConsoleFile]" } else { $PSCPrompt = '' }
-    if($NestedPromptLevel -ge 1) { $PromptLevel = 'PS .\> >' } else { $PromptLevel = 'PS .\>' }
+    if (Get-Variable -Name PSDebugContext -ValueOnly -ErrorAction SilentlyContinue) { $DebugPrompt = '[DEBUG]:' } else { $DebugPrompt = '' }
+    if (Get-Variable -Name PSConsoleFile -ValueOnly -ErrorAction SilentlyContinue)  { $PSCPrompt = "[PSConsoleFile: $PSConsoleFile]" } else { $PSCPrompt = '' }
+    if ($NestedPromptLevel -ge 1) { $PromptLevel = 'PS .\> >' } else { $PromptLevel = 'PS .\>' }
 
     return "[{0} @ {1}]`n{2}{3}{4}{5}" -f $Env:COMPUTERNAME, $PWD.Path, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel
 }
@@ -149,8 +153,11 @@ if (Get-Command -Name Set-ConsoleTitle -ErrorAction SilentlyContinue) {
     if ($IsVerbose) {Write-Output -InputObject ''}
 }
 
-# In case any intermediary scripts or module loads change our current directory, restore original path, before it's locked into the window title by Set-ConsoleTitle
-Set-Location $startingPath
+# Display execution policy, for convenience, on Windows only (as ExecutionPolicy is not supported on non-Windows platforms)
+if ($IsWindows) {
+    Write-Output -InputObject 'PowerShell Execution Policy: '
+    Get-ExecutionPolicy -List | Format-Table -AutoSize
+}
 
 # Loading ProfilePal Module, and only if successful, call Set-ConsoleTitle to customize the ConsoleHost window title
 Import-Module -Name ProfilePal
@@ -159,15 +166,22 @@ if ($?) {
     Set-ConsoleTitle
 }
 
-# Here's an example of how convenient aliases can be added to your PS profile
-New-Alias -Name rdp -Value Start-RemoteDesktop -ErrorAction Ignore
+Write-Verbose -Message ('$HostOS = ''{0}''' -f $HostOS)
+# Detect host OS and then jump to the OS specific profile sub-script
+if ($IsLinux) {
+    $Private:SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-Linux.ps1')
+}
 
-Write-Output -InputObject ''
-Write-Output -InputObject ' ** To view additional available modules, run: Get-Module -ListAvailable'
-Write-Output -InputObject ' ** To view cmdlets available in a given module, run: Get-Command -Module <ModuleName>'
+if ($IsMacOS) {
+    $Private:SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-macOS.ps1')
+}
 
-# Do you like easter eggs?:
-#& iex (New-Object Net.WebClient).DownloadString('http://bit.ly/e0Mw9w')
+if ($IsWindows) {
+    $Private:SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-Windows.ps1')
+}
+
+if ($IsVerbose) {Write-Output -InputObject ''}
+Write-Verbose -Message ('$SubProfile = ''{0}''' -f $Private:SubProfile)
 
 # Load/invoke OS specific profile sub-script
 if (Test-Path -Path $SubProfile) {

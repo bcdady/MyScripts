@@ -140,7 +140,7 @@ Write-Verbose -Message (' ... from {0}' -f $MyScriptInfo.CommandPath)
         $OS_INFO = cat /etc/*-release | ConvertFrom-StringData
         if ('PRETTY_NAME' -in $OS_INFO.keys) {
             # the -replace handler removes superfluous double-quote characters
-            $hostOSCaption = $OS_INFO.PRETTY_NAME -replace "\"""  
+            $hostOSCaption = $OS_INFO.PRETTY_NAME -replace "\"""
         }
         if (-not (Test-Path -LiteralPath Env:COMPUTERNAME -ErrorAction SilentlyContinue)) {
             $Env:COMPUTERNAME = $(hostname)
@@ -245,7 +245,7 @@ if ($IsVerbose) { Write-Output -InputObject '' }
     } else {
         # Setup "MyPS" variables with PowerShell (pwsh) common paths for non-Windows / PS Core host
         # https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-core-on-linux?view=powershell-6#paths
-        # User profiles will be read from ~/.config/powershell/profile.ps1 (and for our purposes, user Scripts should be in the same place) 
+        # User profiles will be read from ~/.config/powershell/profile.ps1 (and for our purposes, user Scripts should be in the same place)
         $myPSScriptsPath = "~/.config/powershell/scripts"
         if (-not (Test-Path -Path $myPSScriptsPath)) {
             New-Item -Path "~/.config/powershell/" -ItemType Directory -Name 'scripts'
