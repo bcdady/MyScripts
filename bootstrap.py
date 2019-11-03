@@ -10,7 +10,7 @@
 # ===================================== #
 
 IsVerbose = False
-
+SleepTime = 5
  # Region PowerShell Header
 """
     [CmdletBinding()]
@@ -87,9 +87,14 @@ IsVerbose = False
 """
 
 # Region python header : import
-import sys
-import os
 import argparse
+import os
+from os import path
+import platform
+import sys
+import time
+
+print("Start : %s" % time.ctime())
 
 # format output with some whitespace
 print('')
@@ -101,6 +106,21 @@ pwd = os.getcwd()
 print('')
 print('PWD is: ', pwd)
 
+# printing environment variables
+print('')
+print('Environment Variables:')
+print(' # # #')
+for k, v in os.environ.items():
+    print(f'{k}={v}')
+print(' # # #')
+print('')
+
+if 'HOME' in os.environ:
+    print('HOME is {}'.format(os.environ['HOME']))
+else:
+    print('HOME does not exist')
+
+print('')
 # Region HostOS
 # Setup common variables for the shell/host environment
 # Using sys module
@@ -122,58 +142,57 @@ IsWindows = False
 IsLinux = False
 IsMacOS = False
 IsAdmin = False
-#IsServer  = False
+IsServer = False
+
+# Setup OS and version variables
+COMPUTERNAME=platform.node()
+
+print('Platform / hostOS is \'{}\''.format(platform.system()))
+hostOS = platform.system() # 'Windows'
+
 
 if sys.platform == "win32":
     IsWindows = True
-elif sys.platform == "mac" or sys.platform == "macos" or sys.platform == "darwin":
-    IsMacOS = True
-else:
-    IsLinux = True
+    # hostOS = 'Windows'
+    platform.win32_ver
 
-# CheckOS and version, based on SHELL environment variables ?
-"""
-MACHTYPE=x86_64-apple-darwin17
-MAILCHECK=60
-OPTERR=1
-OPTIND=1
-OSTYPE=darwin17
- """
-
-if IsWindows:
-    hostOS = 'Windows'
     #hostOSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property Caption, LastBootUpTime
     #LastBootUpTime = hostOSInfo.LastBootUpTime # @{Name="Uptime";Expression={((Get-Date)-$_.LastBootUpTime -split '\.')[0]}}
     #hostOSCaption = hostOSInfo.Caption -replace 'Microsoft ', ''
     #if hostOSCaption -like '*Windows Server*':
     #    IsServer = True
 
-# Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
-#IsAdmin = (([security.principal.windowsprincipal] [security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    # Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
+    #IsAdmin = (([security.principal.windowsprincipal] [security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
 
-if IsLinux:
-    hostOS = 'Linux'
-    hostOSCaption = $(uname -mrs)
-    OS_INFO = cat /etc/*-release | ConvertFrom-StringData
-    #if ('PRETTY_NAME' -in $OS_INFO.keys) {
-        # the -replace handler removes superfluous double-quote characters
-    #    hostOSCaption = $OS_INFO.PRETTY_NAME -replace "\"""
+elif sys.platform == "mac" or sys.platform == "macos" or sys.platform == "darwin":
+    IsMacOS = True
 
-    #if (-not (Test-Path -LiteralPath Env:COMPUTERNAME -ErrorAction SilentlyContinue)) {
-    COMPUTERNAME=`hostname`
-
-if IsMacOS:
     # !RFE: enhance dynamic hostOS and hostOSCaption population and evaluation
-    hostOS = 'macOS'
-    hostOSCaption = ($(sw_vers -productName), ' ', $(sw_vers -productVersion)) # $(uname -mrs)
-    #if (-not (Test-Path -LiteralPath Env:ComputerName -ErrorAction SilentlyContinue)) {
-    COMPUTERNAME=`hostname`
+    #hostOS = 'macOS'
+    #hostOSCaption = ($(sw_vers -productName), ' ', $(sw_vers -productVersion)) # $(uname -mrs)
+    hostOSCaption = '{}'.format(platform.mac_ver)
 
     print('')
 #    print (' # {0} {1} {2} on {3} - {4} #' -f $ShellId, host.version.toString().substring(0,3), $PSEdition, hostOSCaption, COMPUTERNAME)
 
-    print('Setting environment HostOS to {0}', $hostOS)
-    #$Env:HostOS = hostOS
+    # Check root or sudo 
+    #IsAdmin =~ ?
+
+else:
+    IsLinux = True
+    #hostOS = 'Linux'
+
+    #distro = platform.linux_distribution()
+    #hostOSCaption = '{} {}'.format(distro[0], distro[1])
+    hostOSCaption = '{} {}'.format(platform.linux_distribution()[0], platform.linux_distribution()[1])
+    
+    # Check root or sudo 
+    #IsAdmin =~ ?
+
+
+#print('Setting environment HostOS to {}'.format(hostOS)
+#$Env:HostOS = hostOS
 
 #End Region HostOS
 
@@ -224,6 +243,9 @@ print('')
     }
  """
     # Bootstrap is intended to live next to User Profile (pwsh) scripts, so regardless of PSEdition (Core or Desktop), it's root should be $myPSHome
+# HOME = os.environ['HOME']
+# path.exists(HOME)
+
 #    $myPSHome =$MyScriptInfo.CommandRoot
 
     #if IsWindows:
@@ -302,7 +324,6 @@ print('')
     }
 #End Region
 
-"""
   #Region ModulePath
     # check and conditionally update/fix PSModulePath
     print('MyPSModulesPath: {0}' -f $myPSModulesPath)
@@ -324,9 +345,25 @@ print('')
   #End Region ModulePath
  """
 
+print("Almost done ... : %s" % time.ctime())
+
 print('')
-print(' # # python Environment Bootstrap Complete #')
+print(' # # Python Environment Bootstrap Complete #')
 print('')
 
+# Get the current locals().items() into a variable, as otherwise it changes during the subsequent for loop
+varList = dict(locals())
+# but remove varList as a key from itself
+#del varList['varList']
+
+print('List of final variables (locals()):')
+for k, v in varList.items():
+    print(f'{k}={v}')
+
+print('')
 # Uncomment the following line for testing / pausing between profile/bootstrap scripts
-#Start-Sleep -Seconds 5
+#time.sleep( SleepTime )
+
+print("End : %s" % time.ctime())
+
+sys.exit(0)
