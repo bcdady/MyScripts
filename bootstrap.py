@@ -55,26 +55,19 @@ IsServer = False
 # Setup OS and version variables
 COMPUTERNAME=platform.node()
 
-print(' < Platform / hostOS is \'{}\' >'.format(platform.system()))
-print(' < Platform / hostOSCaption (?) is \'{}\' >'.format(platform.platform(aliased=1, terse=1)))
-
 hostOS = platform.system() # 'Windows'
+print(' < Platform / hostOS is \'{}\' >'.format(hostOS))
+hostOSCaption = platform.platform(aliased=1, terse=1)
+print(' < Platform / hostOSCaption (?) is \'{}\' >'.format(hostOSCaption))
 
 if sys.platform == "win32":
     # hostOS = 'Windows'
     IsWindows = True
 
-    hostOSCaption = platform.platform(aliased=1, terse=1)
-
     #if hostOSCaption -like '*Windows Server*':
     #    IsServer = True
 
-    #if 'HOME' in os.environ:
     HOME = os.environ['USERPROFILE']
-    # else:
-    #     print('HOME does not exist')
-    #     # derive it from sysconfig 'userbase' with help from os path dirname
-    #     HOME = os.path.abspath(os.path.dirname(sysconfig.get_config_var('userbase')))
 
     # Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
     #IsAdmin = (([security.principal.windowsprincipal] [security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -82,28 +75,27 @@ if sys.platform == "win32":
 elif sys.platform == "mac" or sys.platform == "macos" or sys.platform == "darwin":
     IsMacOS = True
     hostOS = 'macOS'
-    #hostOSCaption = ($(sw_vers -productName), ' ', $(sw_vers -productVersion)) # $(uname -mrs)
-    
-    hostOSCaption = platform.platform(aliased=1, terse=1)
 
-    if platform.mac_ver()[0].__len__():
-        macOS_ver = platform.mac_ver()[0]
-        # https://en.m.wikipedia.org/wiki/List_of_Apple_operating_systems#macOS
-        macOS_names = dict({'10.15': 'Catalina', '10.14': 'Mojave', '10.13': "High Sierra", '10.12': 'Sierra', '10.11': 'El Capitan', '10.10': 'Yosemite'})
-        hostOSCaption = 'Mac OS X {} {}'.format(macOS_ver, macOS_names[macOS_ver])
-    
+    #if platform.mac_ver()[0].__len__():
+    # Get the macOS major and minor version numbers (first 5 characters of first item in mac_ver dictionary)
+    macOS_ver = platform.mac_ver()[0][0:5]
+    # https://en.m.wikipedia.org/wiki/List_of_Apple_operating_systems#macOS
+    macOS_names = dict({'10.15': 'Catalina', '10.14': 'Mojave', '10.13': "High Sierra", '10.12': 'Sierra', '10.11': 'El Capitan', '10.10': 'Yosemite'})
+    hostOSCaption = 'Mac OS X {} {}'.format(macOS_ver, macOS_names[macOS_ver])
+
     HOME = os.environ['HOME']
-    # Check root or sudo 
+
+    # Check root or sudo
     #IsAdmin =~ ?
 
 else:
     IsLinux = True
     #hostOS = 'Linux'
     hostOSCaption = '{} {}'.format(platform.linux_distribution()[0], platform.linux_distribution()[1])
-    
+
     HOME = os.environ['HOME']
 
-    # Check root or sudo 
+    # Check root or sudo
     #IsAdmin =~ ?
 
 print('HOME is \'{}\''.format(HOME))
@@ -117,7 +109,7 @@ print('\n # Python {} on {} - {} #'.format(sysconfig.get_config_var('py_version'
 
 #print('\n # # Python Environment Bootstrap Complete #\n')
 
-""" 
+"""
     # Get the current locals().items() into a variable, as otherwise it changes during the subsequent for loop
     varList = dict(locals())
     # but remove varList as a key from itself
