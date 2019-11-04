@@ -12,8 +12,8 @@
 
 # Set UNINSTALL="TRUE" for force deletion of any existing PowerShell directories
 UNINSTALL='FALSE'
-PWSHMACURL='https://github.com/PowerShell/PowerShell/releases/download/v6.0.1/powershell-6.0.1-osx-x64.tar.gz'
-PWSHMACVER='6.0.1'
+#PWSHMACURL='https://github.com/PowerShell/PowerShell/releases/download/v6.0.1/powershell-6.0.1-osx-x64.tar.gz'
+#PWSHMACVER='6.0.1'
 
 # To install PowerShell Core 6.0+ via Homebrew, local Mac OS must be at least 10.12
 req_version='12'
@@ -33,7 +33,7 @@ homebrew_version="$(brew --version | grep 'Homebrew >=')"
 
 # To avoid/workaround decimal comparisons, we assume OSX 10.n and only compare minor versions
 if [ "${minor_version}" -lt "${req_version}" ]; then
-    echo "$product_name ${major_version}.${minor_version} not supported for PowerShell package management via Homebrew Cask"
+    echo "$product_name ${major_version}.${minor_version} is not supported for package management via Homebrew Cask"
 else
     if [ $homebrew_version ]; then
         echo "${homebrew_version}"
@@ -83,11 +83,11 @@ if [ $homebrew_version ]; then
     brew cask install powershell
     echo ''
 else
-    # Installation via Binary Archive
+    Installation via Binary Archive
     echo 'Homebrew not found. Proceeding wtih Installation via Binary Archive method'
     echo ''
 
-    # Download the powershell '.tar.gz' archive
+    Download the powershell '.tar.gz' archive
     temp_file="/tmp/powershell.tar.gz"
     if [ -f "$temp_file" ]
     then
@@ -97,31 +97,31 @@ else
         curl -L -o /tmp/powershell.tar.gz $PWSHMACURL
     fi
 
-    # Create the target folder where powershell will be placed
+    Create the target folder where powershell will be placed
     target_dir="/usr/local/microsoft/powershell/$PWSHMACVER"
     if ! [ -d "$target_dir" ]; then
-    #    echo "Confirmed folder ${target_dir} exists."
-    #else
+       echo "Confirmed folder ${target_dir} exists."
+    else
         echo "Creating PowerShell folder ${target_dir}."
         sudo mkdir -p $target_dir
     fi
 
-    # Expand powershell to the target folder
+    Expand powershell to the target folder
     echo 'Expand powershell archive.'
     sudo tar zxf /tmp/powershell.tar.gz -C $target_dir
     echo ''
 
-    # Confirm the powershell archive expanded to the target folder
+    Confirm the powershell archive expanded to the target folder
     target_file="$target_dir/pwsh"
     if [ -f "$target_file" ]; then
         echo "Confirmed ${target_file} exists."
 
-        # Set execute permissions
+        Set execute permissions
         echo 'Set execute permissions'
         sudo chmod +x "${target_file}"
         echo ''
 
-        # Create the symbolic link that points to pwsh
+        Create the symbolic link that points to pwsh
         echo 'Creating symbolic link for pwsh.'
         sudo ln -s $target_file /usr/local/bin/pwsh
     else

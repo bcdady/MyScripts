@@ -1,5 +1,5 @@
 #!pwsh
-#Requires -Version 3
+#Requires -Version 5
 #========================================
 # NAME      : Bootstrap.ps1
 # LANGUAGE  : Microsoft PowerShell
@@ -10,6 +10,7 @@
 #========================================
 [CmdletBinding()]
 param()
+#Set-StrictMode -Version latest
 
 # Uncomment the following 2 lines for testing profile scripts with Verbose output
 #'$VerbosePreference = ''Continue'''

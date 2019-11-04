@@ -52,14 +52,48 @@ if ([Version]('{0}.{1}' -f $Host.Version.Major, $Host.Version.Minor) -le [Versio
 Write-Verbose -Message 'Importing function Get-NetInterface'
 function Get-NetInterface {
     [CmdletBinding()]
-    param ()
-    # Enumerate network interfaces, and determine the active/default interface
-    # In a Linux os macOS context, this is derived from the network interface attached to the default gateway
-    # In Windows, the default gateway is less easily determined, so the 1st 'UP' interface is inferred as the active adapter
+    Param (
+        [Parameter(Position=0, ParameterSetName='ByIndex', ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [ValidateScript({$PSItem -in (
+            if ($IsWindows) {
+                Get-NetAdapter | Select-Object -ExpandProperty ifIndex
+            } else {
+                (ip address show) -match "\b(\d+):"
+            }
+        )})]
+        [Alias('ifIndex')]
+        [Int]
+        $InterfaceIndex,
+        [Parameter(Position=0, Mandatory, ParameterSetName='ByName', ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [ValidateScript({$PSItem -in (
+            if ($IsWindows) {
+                Get-NetAdapter | Select-Object -ExpandProperty ifAlias
+            } else {
+                (ip address show) -match "\b\d+:\s+(\S+):"
+            }
+        )})]
+        [Alias('InterfaceAlias','ifAlias')]
+        [String]
+        $Name = (Get-NetAdapter | Select-Object -ExpandProperty ifAlias | Sort-Object | Select-Object -First 1),
+        [Parameter(Position=1)]
+        [ValidateSet('Charter','Custom','Default','DHCP','CloudFlare','Google','OpenDNS','Quad9','UltraDNS')]
+        [String]
+        $DNSprovider,
+        [switch]
+        $Force
+    )
+    # Enumerate network interfaces, and determine the active/default interface, based on the network interface attached to the default gateway
+    # default via 192.168.0.1 dev wlp2s0 proto dhcp metric 600 
 
     if ($IsWindows) {
-        # get interface / adapter properties; do we need aliases to match properties of Linux and macOS
-        $Interface = Get-NetAdapter | Select-Object -Property Name, Index, Status
+        Write-Verbose -Message 'Getting Network Adapter'
+        $NetAdapter = Get-NetAdapter | Where-Object {($_.Status -eq 'Up') -or ($_.MediaConnectionState -eq 'Connected')} | Select-Object -Property ifIndex, ifAlias
+        $Interface = [ordered]@{
+            Name     = $NetAdapter.Name
+            Gateway  = $Matches.gateway
+            Protocol = $Matches.proto
+        }
+
     } else {
         Write-Verbose -Message 'Getting network connection - Default Gateway'
         $null = (ip route | grep default) -match 'default via (?<gateway>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) dev (?<interface>\S+) proto (?<proto>\S+) metric (?<metric>\d+)'
@@ -95,12 +129,6 @@ function Get-NetInterface {
 
         # get interface status, silently
         $null = $if_info -match "\b(?<InterfaceIndex>\d+): \S+: .+ state (?<state>\S+) group (?<group>\S+)"
-        # if ($? -and ($Matches.Count -ge 3)) {
-        #     '$Matches:'
-        #     $Matches
-        # } else {
-        #     Write-Warning -Message 'No Matches'
-        # }
 
         # Add new key/value pairs, with aliases
         $Interface.Add('Group',$Matches.group)
@@ -307,6 +335,30 @@ function Get-MyDNS {
         #Write-Output -InputObject 'Active network adapter DNS server settings'
         return $ActiveAdapter
     }
+<#
+.SYNOPSIS
+    Get current DNS client settings, such as the DNS resolver server addresses for a particular network adapter/interface
+.DESCRIPTION
+    Get current DNS client settings, such as the DNS resolver server addresses for a particular network adapter/interface.
+    Supports IPv4 and IPV6
+.EXAMPLE
+        PS .\>Get-MyDNS
+
+        ifOperStatus             : Up
+        ifAlias                  : Wi-Fi
+        ifIndex                  : 9
+        ifDesc                   : Dell Wireless 1560 802.11ac
+        ifName                   : wireless_32768
+        DNS.IPv4.ServerAddresses : {1.0.0.1, 1.1.1.1}
+        DNS.IPv6.ServerAddresses : {}    
+
+.INPUTS
+    Inputs (if any)
+.OUTPUTS
+    Output (if any)
+.NOTES
+    General notes
+#>
 }
 
 Write-Verbose -Message 'Importing function Set-MyDNS'
@@ -332,7 +384,6 @@ function Set-MyDNS {
     )
 
     begin {
-
         # Set-DnsClientServerAddress requires elevated privileges; let's see if we've got them
 
         function Test-Privilege {
