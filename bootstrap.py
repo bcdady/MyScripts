@@ -4,7 +4,7 @@
 # LANGUAGE  : Python
 # VERSION   : 3
 # AUTHOR    : Bryan Dady
-# UPDATED   : 11/1/2019 - Convert from PowerShell Core
+# UPDATED   : 11/4/2019 - enhanced macOS versions and nicknames
 # INTRO     : To be loaded / dot-sourced from a python profile script, to establish (bootstrap) baseline consistent environment variables,
 #             regardless of version, or operating system
 # ===================================== #
@@ -55,7 +55,7 @@ IsServer = False
 # Setup OS and version variables
 COMPUTERNAME=platform.node()
 
-hostOS = platform.system() # 'Windows'
+hostOS = platform.system()
 print(' < Platform / hostOS is \'{}\' >'.format(hostOS))
 hostOSCaption = platform.platform(aliased=1, terse=1)
 print(' < Platform / hostOSCaption (?) is \'{}\' >'.format(hostOSCaption))
