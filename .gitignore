@@ -47,3 +47,6 @@ Temporary Items
 .apdisk
 *.orig
 *.bak
+
+# python cache directory e.g. __pycache__/bootstrap.cpython-38.pyc
+__pycache__

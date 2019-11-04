@@ -4,30 +4,34 @@
 # LANGUAGE  : Python
 # VERSION   : 3
 # AUTHOR    : Bryan Dady
-# UPDATED   : 11/4/2019 - enhanced macOS versions and nicknames
+# UPDATED   : 11/4/2019 - added persistent variables output (see line 113)
 # INTRO     : To be loaded / dot-sourced from a python profile script, to establish (bootstrap) baseline consistent environment variables,
 #             regardless of version, or operating system
 # ===================================== #
 
 import argparse
 import os
-from os import path
 import platform
 import sys
 import sysconfig
 import time
+from pathlib import Path
 
 IsVerbose = False
 SleepTime = 5
 
-print('\n ! Start : {}'.format(time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
+# MyScriptInfo
+MyCommandPath = sys.argv[0]
+MyCommandName = Path(MyCommandPath).name # requires 'from pathlib import Path'
+
+print('\n ! Start {}: {}'.format(MyCommandName, time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
 
 # format output with some whitespace
-print('\n # # Initiating python environment bootstrap #')
-print(' ... from {}\n'.format(sys.argv[0]))
+# print('\n # # Initiating python environment bootstrap #')
+# print(' ... from {}\n'.format(sys.argv[0]))
 
 # http://www.effbot.org/librarybook/os.htm : where are we?
-pwd = os.getcwd()
+# pwd = os.getcwd()
 #print('')
 #print('PWD is: ', pwd)
 
@@ -98,14 +102,22 @@ else:
     # Check root or sudo
     #IsAdmin =~ ?
 
-print('HOME is \'{}\''.format(HOME))
+print(' < HOME is \'{}\' >'.format(HOME))
 
 # if we ever need to confirm that the path is available on the filesystem, use: path.exists(HOME)
-
-print('\n # Python {} on {} - {} #'.format(sysconfig.get_config_var('py_version'), hostOSCaption, COMPUTERNAME))
+py_version =sysconfig.get_config_var('py_version')
+print('\n # Python {} on {} - {} #'.format(py_version, hostOSCaption, COMPUTERNAME))
 
 #print('Setting environment HostOS to {}'.format(hostOS)
-#$Env:HostOS = hostOS
+# Save what we've determined here in shell/system environment variables, so they can be easily referenced from other py scripts/functions
+print('\n Here are the persistent variables to import into the next script: ... ')
+print('from bootstrap import HOME')
+print('from bootstrap import COMPUTERNAME')
+print('from bootstrap import hostOS')
+print('from bootstrap import hostOSCaption')
+print('from bootstrap import IsWindows')
+print('from bootstrap import IsLinux')
+print('from bootstrap import IsMacOS')
 
 #print('\n # # Python Environment Bootstrap Complete #\n')
 
