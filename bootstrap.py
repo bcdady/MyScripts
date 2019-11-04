@@ -20,7 +20,7 @@ import time
 IsVerbose = False
 SleepTime = 5
 
-print('Start : {}\n'.format(time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
+print('\n ! Start : {}'.format(time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
 
 # format output with some whitespace
 print('\n # # Initiating python environment bootstrap #')
@@ -30,17 +30,6 @@ print(' ... from {}\n'.format(sys.argv[0]))
 pwd = os.getcwd()
 #print('')
 #print('PWD is: ', pwd)
-
-if 'HOME' in os.environ:
-    HOME = os.environ['HOME']
-else:
-    print('HOME does not exist')
-    # derive it from sysconfig 'userbase' with help from os path dirname
-    HOME = os.path.abspath(os.path.dirname(sysconfig.get_config_var('userbase')))
-
-print('HOME is \'{}\'\n'.format(HOME))
-
-# if we ever need to confirm that the path is available on the filesystem, use: path.exists(HOME)
 
 # Region HostOS
 # Setup common variables for the shell/host environment
@@ -66,19 +55,26 @@ IsServer = False
 # Setup OS and version variables
 COMPUTERNAME=platform.node()
 
-print('Platform / hostOS is \'{}\''.format(platform.system()))
+print(' < Platform / hostOS is \'{}\' >'.format(platform.system()))
+print(' < Platform / hostOSCaption (?) is \'{}\' >'.format(platform.platform(aliased=1, terse=1)))
+
 hostOS = platform.system() # 'Windows'
 
 if sys.platform == "win32":
-    IsWindows = True
     # hostOS = 'Windows'
-    platform.win32_ver
+    IsWindows = True
 
-    #hostOSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property Caption, LastBootUpTime
-    #LastBootUpTime = hostOSInfo.LastBootUpTime # @{Name="Uptime";Expression={((Get-Date)-$_.LastBootUpTime -split '\.')[0]}}
-    #hostOSCaption = hostOSInfo.Caption -replace 'Microsoft ', ''
+    hostOSCaption = platform.platform(aliased=1, terse=1)
+
     #if hostOSCaption -like '*Windows Server*':
     #    IsServer = True
+
+    #if 'HOME' in os.environ:
+    HOME = os.environ['USERPROFILE']
+    # else:
+    #     print('HOME does not exist')
+    #     # derive it from sysconfig 'userbase' with help from os path dirname
+    #     HOME = os.path.abspath(os.path.dirname(sysconfig.get_config_var('userbase')))
 
     # Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
     #IsAdmin = (([security.principal.windowsprincipal] [security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -88,12 +84,15 @@ elif sys.platform == "mac" or sys.platform == "macos" or sys.platform == "darwin
     hostOS = 'macOS'
     #hostOSCaption = ($(sw_vers -productName), ' ', $(sw_vers -productVersion)) # $(uname -mrs)
     
+    hostOSCaption = platform.platform(aliased=1, terse=1)
+
     if platform.mac_ver()[0].__len__():
         macOS_ver = platform.mac_ver()[0]
         # https://en.m.wikipedia.org/wiki/List_of_Apple_operating_systems#macOS
         macOS_names = dict({'10.15': 'Catalina', '10.14': 'Mojave', '10.13': "High Sierra", '10.12': 'Sierra', '10.11': 'El Capitan', '10.10': 'Yosemite'})
         hostOSCaption = 'Mac OS X {} {}'.format(macOS_ver, macOS_names[macOS_ver])
     
+    HOME = os.environ['HOME']
     # Check root or sudo 
     #IsAdmin =~ ?
 
@@ -102,15 +101,19 @@ else:
     #hostOS = 'Linux'
     hostOSCaption = '{} {}'.format(platform.linux_distribution()[0], platform.linux_distribution()[1])
     
+    HOME = os.environ['HOME']
+
     # Check root or sudo 
     #IsAdmin =~ ?
 
+print('HOME is \'{}\''.format(HOME))
 
-print('\n # Python {} on {} - {} #\n'.format(sysconfig.get_config_var('py_version'), hostOSCaption, COMPUTERNAME))
+# if we ever need to confirm that the path is available on the filesystem, use: path.exists(HOME)
+
+print('\n # Python {} on {} - {} #'.format(sysconfig.get_config_var('py_version'), hostOSCaption, COMPUTERNAME))
 
 #print('Setting environment HostOS to {}'.format(hostOS)
 #$Env:HostOS = hostOS
-
 
 #print('\n # # Python Environment Bootstrap Complete #\n')
 
@@ -128,6 +131,6 @@ print('\n # Python {} on {} - {} #\n'.format(sysconfig.get_config_var('py_versio
 # Uncomment the following line for testing / pausing between profile/bootstrap scripts
 #time.sleep( SleepTime )
 
-print('\nEnd : {}'.format(time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
+print('\nEnd : {}\n'.format(time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
 
 #sys.exit(0)

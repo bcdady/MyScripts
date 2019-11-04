@@ -1,14 +1,14 @@
 #!/usr/local/bin/python3
 # ===================================== #
-# NAME      : environ.py
+# NAME      : show_sysconfig.py
 # LANGUAGE  : Python
 # VERSION   : 3
 # AUTHOR    : Bryan Dady
-# UPDATED   : 11/1/2019 - reference working with system environment variables
+# UPDATED   : 11/1/2019 - reference working with system config variables
 # ===================================== #
 
-import os
 import sys
+import sysconfig
 import time
 
 print('Start {}: {}\n'.format(sys.argv[0], time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
