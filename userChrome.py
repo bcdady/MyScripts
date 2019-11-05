@@ -100,21 +100,27 @@ userChromePath = chromePath.joinpath('userChrome.css')
 if IsVerbose:
     print_var('[test step] Remove userChromePath', userChromePath)
     userChromePath.unlink(missing_ok=True)
-    print_var('Does userChrome.css exists', userChromePath.exists())
+    print_var('userChrome.css exist', userChromePath.exists())
 
-# specify userChrome.css file contents
-userChromeData = '<!-- Firefox userChrome.css -->\n<!-- line 2 -->\n'
-# write those contents into the file
-userChromePath.write_text(userChromeData, encoding='utf-8') # , errors=None)
-print_var('userChromePath', userChromePath)
+if userChromePath.exists():
+    print(' Found!: {}'.format(userChromePath))
 
-print_var('Validate userChromePath exists', userChromePath.exists())
+else:
+    print(' Creating {} ...'.format(userChromePath))
+    # specify userChrome.css file contents
+    userChromeData = '<!-- Firefox userChrome.css -->\n<!-- line 2 -->\n'
+    # write those contents into the file
+    userChromePath.write_text(userChromeData, encoding='utf-8') # , errors=None)
+    print_var('userChromePath', userChromePath)
+
+print_var('userChromePath exists', userChromePath.exists())
 
 # # 
 # if IsVersbose, refresh, read / print contents of file
-if IsVerbose:
+if IsVerbose or userChromePath.exists():
+    #print(' Found!: {}'.format(userChromePath))
     #userChromePath = Path(userChromePath)
-    print(' ! userChrome.css contents:\n -----------------------------------------')
+    print(' file contents:\n -----------------------------------------')
     print(userChromePath.read_text())
     print(' -----------------------------------------')
 # #

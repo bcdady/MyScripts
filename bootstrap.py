@@ -33,7 +33,9 @@ SleepTime = 3
 MyCommandPath = sys.argv[0]
 MyCommandName = Path(MyCommandPath).name # requires 'from pathlib import Path'
 
-print('\n Start {}: {}'.format(MyCommandName, time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
+# Only print Start and Stop Header/Footer when called directly, so as to not confuse use of argv[0]
+if MyCommandName == 'bootstrap.py':
+    print('\n Start {}: {}'.format(MyCommandName, time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
 
 # http://www.effbot.org/librarybook/os.htm : where are we?
 # pwd = os.getcwd()
@@ -139,7 +141,8 @@ print_var('global variables','HOME, COMPUTERNAME, hostOS, hostOSCaption, IsWindo
         print(f'{k}={v}')
  """
 
-print(' End: {}\n'.format(time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
+if MyCommandName == 'bootstrap.py':
+    print(' End: {}\n'.format(time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
 
 # When IsVerbose, pausing between profile/bootstrap scripts to aid in visual testing
 if IsVerbose:
