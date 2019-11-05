@@ -4,7 +4,7 @@
 # LANGUAGE  : Python
 # VERSION   : 3
 # AUTHOR    : Bryan Dady
-# UPDATED   : 11/4/2019 - added persistent variables output (see line 113)
+# UPDATED   : 11/4/2019 - Enhance IsVerbose behavior with print_var function
 # INTRO     : To be loaded / dot-sourced from a python profile script, to establish (bootstrap) baseline consistent environment variables,
 #             regardless of version, or operating system
 # ===================================== #
@@ -17,18 +17,23 @@ import sysconfig
 import time
 from pathlib import Path
 
-IsVerbose = False
-SleepTime = 5
+# setup global variables to export
+global HOME
+global COMPUTERNAME
+global hostOS
+global hostOSCaption
+global IsWindows
+global IsLinux
+global IsMacOS
+
+IsVerbose = False # True
+SleepTime = 3
 
 # MyScriptInfo
 MyCommandPath = sys.argv[0]
 MyCommandName = Path(MyCommandPath).name # requires 'from pathlib import Path'
 
-print('\n ! Start {}: {}'.format(MyCommandName, time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
-
-# format output with some whitespace
-# print('\n # # Initiating python environment bootstrap #')
-# print(' ... from {}\n'.format(sys.argv[0]))
+print('\n Start {}: {}'.format(MyCommandName, time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
 
 # http://www.effbot.org/librarybook/os.htm : where are we?
 # pwd = os.getcwd()
@@ -38,31 +43,30 @@ print('\n ! Start {}: {}'.format(MyCommandName, time.strftime('%Y %m %d %H:%M:%S
 # Region HostOS
 # Setup common variables for the shell/host environment
 
-""" # comment block#
-    Get-Variable -Name Is* -Exclude ISERecent | FT
-
-    Name                           Value
-    ----                           -----
-    IsAdmin                        False
-    IsCoreCLR                      True
-    IsLinux                        False
-    IsMacOS                        True
-    IsWindows                      False
-""" # end of comment block#
-
 IsWindows = False
 IsLinux = False
 IsMacOS = False
-IsAdmin = False
-IsServer = False
+#IsAdmin = False
+#IsServer = False
+
+# -- print_var prints a label and a variable's value, if IsVerbose
+def print_var(label, varname):
+    if IsVerbose:
+        print('< {} = \'{}\' >'.format(label, varname))
+
+# -- RFE!: create a similar function for dev/test, which takes 1 arg of a dictionary, and prints the keys and values
+
+# add blank line, only when IsVerbose
+if IsVerbose: print('')
 
 # Setup OS and version variables
 COMPUTERNAME=platform.node()
 
 hostOS = platform.system()
-print(' < Platform / hostOS is \'{}\' >'.format(hostOS))
+print_var('Platform: hostOS', hostOS)
+
 hostOSCaption = platform.platform(aliased=1, terse=1)
-print(' < Platform / hostOSCaption (?) is \'{}\' >'.format(hostOSCaption))
+print_var('Platform: hostOSCaption', hostOSCaption)
 
 if sys.platform == "win32":
     # hostOS = 'Windows'
@@ -102,24 +106,27 @@ else:
     # Check root or sudo
     #IsAdmin =~ ?
 
-print(' < HOME is \'{}\' >'.format(HOME))
+print_var('HOME', HOME)
 
 # if we ever need to confirm that the path is available on the filesystem, use: path.exists(HOME)
 py_version =sysconfig.get_config_var('py_version')
-print('\n # Python {} on {} - {} #'.format(py_version, hostOSCaption, COMPUTERNAME))
+print(' # Python {} on {} - {} #'.format(py_version, hostOSCaption, COMPUTERNAME))
 
-#print('Setting environment HostOS to {}'.format(hostOS)
 # Save what we've determined here in shell/system environment variables, so they can be easily referenced from other py scripts/functions
-print('\n Here are the persistent variables to import into the next script: ... ')
-print('from bootstrap import HOME')
-print('from bootstrap import COMPUTERNAME')
-print('from bootstrap import hostOS')
-print('from bootstrap import hostOSCaption')
-print('from bootstrap import IsWindows')
-print('from bootstrap import IsLinux')
-print('from bootstrap import IsMacOS')
-
+# # 
+# Verbose:
+# print('\n Here are the persistent variables to import into the next script: ... ')
+# print('from bootstrap import HOME')
+# print('from bootstrap import COMPUTERNAME')
+# print('from bootstrap import hostOS')
+# print('from bootstrap import hostOSCaption')
+# print('from bootstrap import IsWindows')
+# print('from bootstrap import IsLinux')
+# print('from bootstrap import IsMacOS')
 #print('\n # # Python Environment Bootstrap Complete #\n')
+# #
+
+print_var('global variables','HOME, COMPUTERNAME, hostOS, hostOSCaption, IsWindows, IsLinux, IsMacOS')
 
 """
     # Get the current locals().items() into a variable, as otherwise it changes during the subsequent for loop
@@ -132,9 +139,11 @@ print('from bootstrap import IsMacOS')
         print(f'{k}={v}')
  """
 
-# Uncomment the following line for testing / pausing between profile/bootstrap scripts
-#time.sleep( SleepTime )
+print(' End: {}\n'.format(time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
 
-print('\nEnd : {}\n'.format(time.strftime('%Y %m %d %H:%M:%S %Z', time.localtime())))
+# When IsVerbose, pausing between profile/bootstrap scripts to aid in visual testing
+if IsVerbose:
+    print('(pause ...)')
+    time.sleep( SleepTime )
 
 #sys.exit(0)
