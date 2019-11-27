@@ -143,8 +143,8 @@ if ($IsVerbose) {print(''})
 # function install-aws # pip3 install awscli2 
 # then to use aws cli, we have to configure permissions, such as follows (or via `aws2 configure`)
 # # ! store AWS access keys / configurations in Env variables
-# export AWS_ACCESS_KEY_ID=AKIAYMPGSOLDZT3AEMGG
-# export AWS_SECRET_ACCESS_KEY=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
+# export AWS_ACCESS_KEY_ID=
+# export AWS_SECRET_ACCESS_KEY=
 # export AWS_DEFAULT_REGION=us-west-2
 
 # install-vscode # it looks like it's technically available in homebrew, but is that supported? # https://code.visualstudio.com/docs/setup/setup-overview
