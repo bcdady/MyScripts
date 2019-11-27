@@ -77,7 +77,12 @@ if sys.platform == "win32":
     #if hostOSCaption -like '*Windows Server*':
     #    IsServer = True
 
+    #if 'HOME' in os.environ:
     HOME = os.environ['USERPROFILE']
+    # else:
+    #     print('HOME does not exist')
+    #     # derive it from sysconfig 'userbase' with help from os path dirname
+    #     HOME = os.path.abspath(os.path.dirname(sysconfig.get_config_var('userbase')))
 
     # Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
     #IsAdmin = (([security.principal.windowsprincipal] [security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -112,7 +117,7 @@ print_var('HOME', HOME)
 
 # if we ever need to confirm that the path is available on the filesystem, use: path.exists(HOME)
 py_version =sysconfig.get_config_var('py_version')
-print(' # Python {} on {} - {} #'.format(py_version, hostOSCaption, COMPUTERNAME))
+print(' # Python {} on {} - {} #'.format(py_version[0:3], hostOSCaption, COMPUTERNAME))
 
 # Save what we've determined here in shell/system environment variables, so they can be easily referenced from other py scripts/functions
 # # 
