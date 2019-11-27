@@ -135,6 +135,27 @@ function prompt {
 }
 if ($IsVerbose) {print(''})
 
+#Create conditional functions for calling back to, if we determine (later) that our python, zsh, iterm, vscode or any other toolchain essentials are not (yet) available
+# function install-xcode # xcode-select —-install
+# function install-homebrew # /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+# -- perhaps conditionally add brew bin-root to PATH # append to .zshrc ? or ~/.profile: export PATH="/usr/local/bin:$PATH"
+# function install-python3 # Install Python 3 and pip3 (from Homebrew) # $ brew install python # https://docs.python-guide.org/starting/install3/osx/#doing-it-right
+# function install-aws # pip3 install awscli2 
+# then to use aws cli, we have to configure permissions, such as follows (or via `aws2 configure`)
+# # ! store AWS access keys / configurations in Env variables
+# export AWS_ACCESS_KEY_ID=AKIAYMPGSOLDZT3AEMGG
+# export AWS_SECRET_ACCESS_KEY=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
+# export AWS_DEFAULT_REGION=us-west-2
+
+# install-vscode # it looks like it's technically available in homebrew, but is that supported? # https://code.visualstudio.com/docs/setup/setup-overview
+
+# function install-homebrew-cask # brew install cask
+# function install-powershell-preview # brew cask install powershell-preview
+
+# function install-ohmyzsh # $ sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+
+# function install-golang # TBD
+
 #Region Bootstrap
     # Invoke Bootstrap.ps1, from the same root path as this $PROFILE script
     if (Get-Variable -Name 'myPS*' -ValueOnly -ErrorAction SilentlyContinue) {
@@ -161,88 +182,37 @@ if ($IsVerbose) {print(''})
     }
 #End Region
 
-<# Yes! This even works in XenApp!
-    & Invoke-Expression (New-Object Net.WebClient).DownloadString('http://bit.ly/e0Mw9w')
-    # start-sleep -Seconds 3
-#>
-if (Get-Command -Name Set-ConsoleTitle -ErrorAction SilentlyContinue) {
-    # Call Set-ConsoleTitle, from ProfilePal module
-    if ($IsVerbose) {print(''})
-    print(' # Set-ConsoleTitle >')
-    Set-ConsoleTitle
-    print(' # < Set-ConsoleTitle')
-    if ($IsVerbose) {print(''})
-}
+# if (Get-Command -Name Set-ConsoleTitle -ErrorAction SilentlyContinue) {
+#     # Call Set-ConsoleTitle, from ProfilePal module
+#     if ($IsVerbose) {print(''})
+#     print(' # Set-ConsoleTitle >')
+#     Set-ConsoleTitle
+#     print(' # < Set-ConsoleTitle')
+#     if ($IsVerbose) {print(''})
+# }
 
 # In case any intermediary scripts or module loads change our current directory, restore original path, before it's locked into the window title by Set-ConsoleTitle
-Set-Location $startingPath
+#Set-Location $startingPath
 
 # Loading ProfilePal Module, and only if successful, call Set-ConsoleTitle to customize the ConsoleHost window title
-Import-Module -Name ProfilePal
-if ($?) {
-    # Call Set-ConsoleTitle function from ProfilePal module
-    Set-ConsoleTitle
-}
-function Initialize-MyScript {
-    [cmdletbinding()]
-    param(
-      # Specifies a path to a script to be run
-        [Parameter(Mandatory,
-            Position=0,
-            ParameterSetName="ParameterSetName",
-            ValueFromPipeline,
-            ValueFromPipelineByPropertyName,
-            HelpMessage="Path to one or more locations.")]
-        [Alias("PSPath")]
-        [ValidateNotNullOrEmpty()]
-        [string[]]
-        $Path
-    )
-
-    # Begin block of Advanced Function
-    Begin {
-        if (Test-Path -Path $Path -PathType Leaf) {
-            # confirmed path is ok, proceed
-            $ScriptPath = $Path
-        } else {
-            # $Path not found, if OS $IsWindows, try \WindowsPowerShell\ instead of \PowerShell\
-            if ($IsWindows) {
-                if (Test-Path -Path ($Path -replace '\\python\\','\WindowsPowerShell\') -PathType Leaf) {
-                    # confirmed path is ok, proceed
-                    print ('Test-Path failed for ''{0}'', but a script with the same name was found at {1} ' -f $Path, $ScriptPath) -Verbose
-                    $ScriptPath = ($Path -replace '\\PowerShell\\','\WindowsPowerShell\')
-                } else {
-                    throw "\tError: Test-Path failed. $Path not found"
-                }
-            } else {
-                throw "\tError: Test-Path failed. $Path not found"
-            }
-        }
-        $ScriptName = Split-Path -Path $ScriptPath -Leaf
-    } # End of Begin block
-
-    # Process block of Advanced Function
-    Process {
-      print (' # Initializing {0} #' -f $ScriptName)
-      print (' . {0}' -f $ScriptPath)
-      # dot-source script file containing Merge-MyPSFiles and related functions
-      . $ScriptPath
-
-    } # End of Process block
-
-    # End block of Advanced Function
-    End { } # End of End block
-
-  }
+#Import-Module -Name ProfilePal
+# if $?:
+#     # Call Set-ConsoleTitle function from ProfilePal module
+#     Set-ConsoleTitle
+# }
 
 print ('$HostOS = ''{0}''' -f $HostOS)
-# Detect host OS and then jump to the OS specific profile sub-script
+# Detect host OS (as set in variables by Bootstrap) and proceed accordingly
 if ($IsLinux) {
-    $Private:SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-Linux.ps1')
+    #$Private:SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-Linux.ps1')
 }
 
 if ($IsMacOS) {
-    $Private:SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-macOS.ps1')
+    #$Private:SubProfile = (Join-Path -Path (split-path -Path $MyScriptInfo.CommandPath) -ChildPath 'Microsoft.PowerShell_profile-macOS.ps1')
+    
+    # Set DNS resolver to Cloudflare secure DNS
+    sudo networksetup -setdnsservers Wi-Fi 1.1.1.1
+
 }
 
 if ($IsWindows) {
@@ -267,9 +237,6 @@ New-Alias -Name rdp -Value Start-RemoteDesktop -ErrorAction Ignore
 print ''
 print ' ** To view additional available modules, run: Get-Module -ListAvailable'
 print ' ** To view cmdlets available in a given module, run: Get-Command -Module <ModuleName>'
-
-# Do you like easter eggs?:
-#& iex (New-Object Net.WebClient).DownloadString('http://bit.ly/e0Mw9w')
 
 if ($IsVerbose) {print ''}
 print ' # End of python $Profile CurrentUserCurrentHost #'
