@@ -116,24 +116,6 @@ else:
 
 exit()
 
-""" print('Defining custom prompt')
-function prompt {
-    if (-not (Test-Path -Path Variable:\IsAdmin)) {
-        # $IsWindows, if not already provided by pwsh $Host, is set in bootstrap.ps1
-        if ($IsWindows) {
-            $IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')
-        } else {
-            $IsAdmin = $False
-        }
-    }
-    if ($IsAdmin) { $AdminPrompt = '[ADMIN]:' } else { $AdminPrompt = '' }
-    if (Get-Variable -Name PSDebugContext -ValueOnly -ErrorAction SilentlyContinue) { $DebugPrompt = '[DEBUG]:' } else { $DebugPrompt = '' }
-    if (Get-Variable -Name PSConsoleFile -ValueOnly -ErrorAction SilentlyContinue)  { $PSCPrompt = "[PSConsoleFile: $PSConsoleFile]" } else { $PSCPrompt = '' }
-    if ($NestedPromptLevel -ge 1) { $PromptLevel = 'PS .\> >' } else { $PromptLevel = 'PS .\>' }
-
-    return "[{0} @ {1}]`n{2}{3}{4}{5}" -f $Env:COMPUTERNAME, $PWD.Path, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel
-}
-if ($IsVerbose) {print(''})
 
 #Create conditional functions for calling back to, if we determine (later) that our python, zsh, iterm, vscode or any other toolchain essentials are not (yet) available
 # function install-xcode # xcode-select —-install
@@ -142,17 +124,7 @@ if ($IsVerbose) {print(''})
 # function install-python3 # Install Python 3 and pip3 (from Homebrew) # $ brew install python # https://docs.python-guide.org/starting/install3/osx/#doing-it-right
 # function install-aws # pip3 install awscli2 
 # then to use aws cli, we have to configure permissions, such as follows (or via `aws2 configure`)
-# # ! store AWS access keys / configurations in Env variables
-# export AWS_ACCESS_KEY_ID=
-# export AWS_SECRET_ACCESS_KEY=
-# export AWS_DEFAULT_REGION=us-west-2
-
-# install-vscode # it looks like it's technically available in homebrew, but is that supported? # https://code.visualstudio.com/docs/setup/setup-overview
-
-# function install-homebrew-cask # brew install cask
-# function install-powershell-preview # brew cask install powershell-preview
-
-# function install-ohmyzsh # $ sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+  # ! instead of storing AWS access keys / configurations in Env variables, use the aws-vault utility
 
 # function install-golang # TBD
 
