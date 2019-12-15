@@ -116,6 +116,12 @@ else:
 
 exit()
 
+""" print('Defining custom prompt')
+def my_function():
+
+    return "[{0} @ {1}]`n{2}{3}{4}{5}" -f $Env:COMPUTERNAME, $PWD.Path, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel
+}
+if ($IsVerbose) {print(''})
 
 #Create conditional functions for calling back to, if we determine (later) that our python, zsh, iterm, vscode or any other toolchain essentials are not (yet) available
 # function install-xcode # xcode-select —-install
