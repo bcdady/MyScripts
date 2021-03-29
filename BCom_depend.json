@@ -1,0 +1,97 @@
+{
+    "package": {
+            "name": "Broadcom BCM4352 Wi-Fi Card",
+            "reference": "Installing Debian on Dell XPS 13 9343",
+            "uri": "https://wiki.debian.org/InstallingDebianOn/Dell/Dell%20XPS%2013%209343",
+            "type": "JSON",
+            "notes" : "Most configurations [of this model] feature the Dell DW1560 802.11ac adapter (Broadcom BCM4352)."
+        },
+    "dependency": {
+        "Name": "WinMerge",
+        "Path": "$myPSModulesPath\\ISESteroids\\3rdParty\\WinMerge\\App\\WinMerge\\WinMergeU.exe",
+        "Help_URL": "http://manual.winmerge.org/Command_line.html",
+        "Options": "/xq /f *.json;*.md;*.ps1;*.psd1;*.psm1;*.txt"
+    },
+    "RepositorySets" : [
+        {
+            "Name": "my_scripts",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Scripts",
+            "TargetPath" : "H:\\My Documents\\WindowsPowerShell\\Scripts"
+        },
+        {
+            "Name": "core_scripts",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Scripts",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\PowerShell\\Scripts"
+        },
+        {
+            "Name": "gh_scripts",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\PowerShell\\Scripts",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\GitHub\\MyScripts"
+        },
+        {
+            "Name": "core_Modules",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\PowerShell\\Modules"
+        },
+        {
+            "Name": "core_Profiles",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\PowerShell"
+        },
+        {
+            "Name": "gh_Profiles",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\PowerShell",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\GitHub\\MyScripts"
+        },
+        {
+            "Name": "my_Profiles",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell",
+            "TargetPath" : "H:\\My Documents\\WindowsPowerShell"
+        },
+        {
+            "Name": "my_Edit-Module",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\Edit-Module",
+            "TargetPath" : "H:\\My Documents\\WindowsPowerShell\\Modules\\Edit-Module"
+        },
+        {
+            "Name": "gh_Edit-Module",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\Edit-Module",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\GitHub\\Edit-Module"
+        },
+        {
+            "Name": "my_Sperry",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\Sperry",
+            "TargetPath" : "H:\\My Documents\\WindowsPowerShell\\Modules\\Sperry"
+        },
+        {
+            "Name": "gh_Sperry",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\Sperry",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\GitHub\\Sperry"
+        },
+        {
+            "Name": "my_ProfilePal",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\ProfilePal",
+            "TargetPath" : "H:\\My Documents\\WindowsPowerShell\\Modules\\ProfilePal"
+        },
+        {
+            "Name": "gh_ProfilePal",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\ProfilePal",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\GitHub\\ProfilePal"
+        },
+        {
+            "Name": "my_PSLogger",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\PSLogger",
+            "TargetPath" : "H:\\My Documents\\WindowsPowerShell\\Modules\\PSLogger"
+        },
+        {
+            "Name": "gh_PSLogger",
+            "SourcePath" : "$env:USERPROFILE\\Documents\\WindowsPowerShell\\Modules\\PSLogger",
+            "TargetPath" : "$env:USERPROFILE\\Documents\\GitHub\\PSLogger"
+        },
+        {
+            "Name": "repo_MyModules",
+            "SourcePath" : "H:\\My Documents\\WindowsPowerShell\\Modules",
+            "TargetPath" : "R:\\IT\\repo\\Modules"
+        }
+    ]
+}

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+
+<plist version="1.0">
+
+<dict>
+
+    <key>Label</key>
+
+    <string>com.custom.NoLogout.agent</string>
+
+    <key>ProgramArguments</key>
+
+    <array>
+
+        <string>/Users/bryandady/.oh-my-zsh/custom/NoLogout.zsh</string>
+
+    <!--
+        <string>write</string>
+
+        <string>/Library/Preferences/.GlobalPreferences.plist</string>
+
+        <string>com.apple.autologout.AutoLogOutDelay -int 0</string>
+
+        <string>-int</string>
+
+        <string>0</string>
+    -->
+
+    </array>
+
+    <key>StartInterval</key>
+
+    <integer>3000</integer>
+
+</dict>
+
+</plist>

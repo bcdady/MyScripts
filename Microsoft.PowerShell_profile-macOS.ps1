@@ -1,5 +1,5 @@
-#!/usr/local/bin/pwsh
-#Requires -Version 6 -module PSLogger
+#!/usr/bin/env pwsh
+#Requires -Version 6
 #========================================
 # NAME      : Microsoft.PowerShell_profile-macOS.ps1
 # LANGUAGE  : Microsoft PowerShell Core
@@ -15,67 +15,14 @@ Set-StrictMode -Version latest
 #'$VerbosePreference = ''Continue'''
 #$VerbosePreference = 'Continue'
 
-Write-Verbose -Message 'Detect -Verbose $VerbosePreference'
-switch ($VerbosePreference) {
-  Stop             { $IsVerbose = $True }
-  Inquire          { $IsVerbose = $True }
-  Continue         { $IsVerbose = $True }
-  SilentlyContinue { $IsVerbose = $False }
-  Default          { if ('Verbose' -in $PSBoundParameters.Keys) {$IsVerbose = $True} else {$IsVerbose = $False} }
-}
-Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f $VerbosePreference, $IsVerbose)
+Get-IsVerbose
 
-#Region MyScriptInfo
-Write-Verbose -Message ('[{0}] Populating $MyScriptInfo' -f $MyInvocation.MyCommand.Name)
-$MyCommandName        = $MyInvocation.MyCommand.Name
-$MyCommandPath        = $MyInvocation.MyCommand.Path
-$MyCommandType        = $MyInvocation.MyCommand.CommandType
-$MyCommandModule      = $MyInvocation.MyCommand.Module
-$MyModuleName         = $MyInvocation.MyCommand.ModuleName
-$MyCommandParameters  = $MyInvocation.MyCommand.Parameters
-$MyParameterSets      = $MyInvocation.MyCommand.ParameterSets
-$MyRemotingCapability = $MyInvocation.MyCommand.RemotingCapability
-$MyVisibility         = $MyInvocation.MyCommand.Visibility
+# Region MyScriptInfo
+# Only call (and use results from Get-MyScriptInfo function, if it was loaded from ./Bootstrap.ps1)
+if (Test-Path -Path Function:\Get-MyScriptInfo) {
+    $MyScriptInfo = Get-MyScriptInfo($MyInvocation) -Verbose
 
-if (($null -eq $MyCommandName) -or ($null -eq $MyCommandPath)) {
-  # We didn't get a successful command / script name or path from $MyInvocation, so check with CallStack
-  Write-Verbose -Message 'Getting PSCallStack [$CallStack = Get-PSCallStack]'
-  $CallStack      = Get-PSCallStack | Select-Object -First 1
-  # $CallStack | Select Position, ScriptName, Command | format-list # FunctionName, ScriptLineNumber, Arguments, Location
-  $myScriptName   = $CallStack.ScriptName
-  $myCommand      = $CallStack.Command
-  Write-Verbose -Message ('$ScriptName: {0}' -f $myScriptName)
-  Write-Verbose -Message ('$Command: {0}' -f $myCommand)
-  Write-Verbose -Message 'Assigning previously null MyCommand variables with CallStack values'
-  $MyCommandPath  = $myScriptName
-  $MyCommandName  = $myCommand
-}
-
-#'Optimize New-Object invocation, based on Don Jones' recommendation: https://technet.microsoft.com/en-us/magazine/hh750381.aspx
-$properties = [ordered]@{
-  'CommandName'        = $MyCommandName
-  'CommandPath'        = $MyCommandPath
-  'CommandType'        = $MyCommandType
-  'CommandModule'      = $MyCommandModule
-  'ModuleName'         = $MyModuleName
-  'CommandParameters'  = $MyCommandParameters.Keys
-  'ParameterSets'      = $MyParameterSets
-  'RemotingCapability' = $MyRemotingCapability
-  'Visibility'         = $MyVisibility
-}
-$MyScriptInfo = New-Object -TypeName PSObject -Property $properties
-Write-Verbose -Message ('[{0}] $MyScriptInfo populated' -f $MyInvocation.MyCommand.Name)
-
-# Cleanup
-foreach ($var in $properties.Keys) {
-  Remove-Variable -Name ('My{0}' -f $var) -Force
-}
-Remove-Variable -Name properties
-Remove-Variable -Name var
-
-if ($IsVerbose) {
-  Write-Verbose -Message '$MyScriptInfo:'
-  $Script:MyScriptInfo
+    if ($IsVerbose) { $MyScriptInfo }    
 }
 #End Region
 
@@ -95,27 +42,34 @@ $PSDefaultParameterValues = @{
 
 Write-Verbose -Message ' ... checking status of PSGallery ...'
 # Check PSRepository status
-$PSGallery = Get-PSRepository -Name PSGallery | Select-Object -Property Name,InstallationPolicy
-if ($PSGallery.InstallationPolicy -ne 'Trusted') {
+#$PSGallery = Get-PSRepository -Name PSGallery | Select-Object -Property Name,InstallationPolicy
+if ((Get-PSRepository -Name PSGallery | Select-Object -Property Name,InstallationPolicy).InstallationPolicy -ne 'Trusted') {
   Write-Output -InputObject '# Trusting PSGallery Repository #'
   Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
 } else {
   Get-PSRepository
 }
-Remove-Variable -Name PSGallery
+#Remove-Variable -Name PSGallery
 
 Write-Debug -Message (' # # # $VerbosePreference: {0} # # #' -f $VerbosePreference)
 Write-Verbose -Message 'Checking that .\scripts\ folder is available'
 
-if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType Container)) {
+if ($variable:myPSScriptsPath) {
     Write-Verbose -Message ('Loading scripts from {0} ...' -f $myPSScriptsPath)
     Write-Output -InputObject ''
-
-    Write-Verbose -Message 'Initializing Set-ConsoleTheme.ps1'
-    . (Join-Path -Path $myScriptsPath -ChildPath 'Set-ConsoleTheme.ps1')
-    Write-Verbose -Message 'Set-ConsoleTheme'
-    Set-ConsoleTheme
-
+    $LoadScript = Join-Path -Path $myPSScriptsPath -ChildPath 'Set-ConsoleTheme.ps1'
+    if (Test-Path -Path $LoadScript) {
+        Write-Verbose -Message 'Initializing Set-ConsoleTheme.ps1'
+        Initialize-MyScript -Path $LoadScript
+        if (Get-Command -Name Set-ConsoleTheme) {
+            Write-Verbose -Message 'Set-ConsoleTheme'
+            Set-ConsoleTheme
+        } else {
+            Write-Warning -Message 'Failed to get command Set-ConsoleTheme'
+        }
+    } else {
+        Write-Warning -Message ('Failed to initialize (dot-source) {0}' -f $LoadScript)
+    }
 } else {
     Write-Warning -Message ('Failed to locate Scripts folder {0}; run any scripts.' -f $myPSScriptsPath)
 }
@@ -162,15 +116,16 @@ New-Alias -Name rename -Value Rename-Item -ErrorAction SilentlyContinue
 
 Write-Output -InputObject ''
 
-# Backup local PowerShell log files
-Write-Output -InputObject 'Archive PowerShell logs'
-Backup-Logs
-# Write-Output -InputObject ('$VerbosePreference: {0} is {1}' -f $VerbosePreference, $IsVerbose)
+if (Get-Command -Name Backup-Logs -ErrorAction SilentlyContinue) {
+    # Backup local PowerShell log files
+    Write-Output -InputObject 'Archive PowerShell logs'
+    Backup-Logs
+}
 
 Write-Output -InputObject ' # End of PowerShell macOS Profile Script #'
 
-<#
-    # For intra-profile/bootstrap script flow Testing
-    Write-Output -InputObject ''
+# For intra-profile/bootstrap script flow Testing
+if ($IsVerbose) {
+    Write-Output -InputObject 'Verbose testing: pausing before proceeding'
     Start-Sleep -Seconds 3
-#>
+}
