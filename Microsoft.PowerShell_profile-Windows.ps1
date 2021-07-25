@@ -100,6 +100,10 @@ $PSDefaultParameterValues = @{
 
 # Write-Debug -Message (' # # # $VerbosePreference: {0} # # #' -f $VerbosePreference)
 
+# Display execution policy, for convenience, on Windows only (as ExecutionPolicy is not supported on non-Windows platforms)
+Write-Output -InputObject 'PowerShell Execution Policy: '
+Get-ExecutionPolicy -List | Format-Table -AutoSize
+
 Write-Verbose -Message 'Declaring function Show-DesktopDocuments'
 function Show-DesktopDocuments {
   Write-Verbose -Message 'Opening all Desktop Documents'

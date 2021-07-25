@@ -1,5 +1,5 @@
-#!/usr/local/bin/pwsh
-#Requires -Version 6 -module PSLogger
+#!/usr/bin/env pwsh
+#Requires -Version 6
 #========================================
 # NAME      : Microsoft.PowerShell_profile-macOS.ps1
 # LANGUAGE  : Microsoft PowerShell Core
@@ -15,67 +15,14 @@ Set-StrictMode -Version latest
 #'$VerbosePreference = ''Continue'''
 #$VerbosePreference = 'Continue'
 
-Write-Verbose -Message 'Detect -Verbose $VerbosePreference'
-switch ($VerbosePreference) {
-  Stop             { $IsVerbose = $True }
-  Inquire          { $IsVerbose = $True }
-  Continue         { $IsVerbose = $True }
-  SilentlyContinue { $IsVerbose = $False }
-  Default          { if ('Verbose' -in $PSBoundParameters.Keys) {$IsVerbose = $True} else {$IsVerbose = $False} }
-}
-Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f $VerbosePreference, $IsVerbose)
+Get-IsVerbose
 
-#Region MyScriptInfo
-Write-Verbose -Message ('[{0}] Populating $MyScriptInfo' -f $MyInvocation.MyCommand.Name)
-$MyCommandName        = $MyInvocation.MyCommand.Name
-$MyCommandPath        = $MyInvocation.MyCommand.Path
-$MyCommandType        = $MyInvocation.MyCommand.CommandType
-$MyCommandModule      = $MyInvocation.MyCommand.Module
-$MyModuleName         = $MyInvocation.MyCommand.ModuleName
-$MyCommandParameters  = $MyInvocation.MyCommand.Parameters
-$MyParameterSets      = $MyInvocation.MyCommand.ParameterSets
-$MyRemotingCapability = $MyInvocation.MyCommand.RemotingCapability
-$MyVisibility         = $MyInvocation.MyCommand.Visibility
+# Region MyScriptInfo
+# Only call (and use results from Get-MyScriptInfo function, if it was loaded from ./Bootstrap.ps1)
+if (Test-Path -Path Function:\Get-MyScriptInfo) {
+    $MyScriptInfo = Get-MyScriptInfo($MyInvocation) -Verbose
 
-if (($null -eq $MyCommandName) -or ($null -eq $MyCommandPath)) {
-  # We didn't get a successful command / script name or path from $MyInvocation, so check with CallStack
-  Write-Verbose -Message 'Getting PSCallStack [$CallStack = Get-PSCallStack]'
-  $CallStack      = Get-PSCallStack | Select-Object -First 1
-  # $CallStack | Select Position, ScriptName, Command | format-list # FunctionName, ScriptLineNumber, Arguments, Location
-  $myScriptName   = $CallStack.ScriptName
-  $myCommand      = $CallStack.Command
-  Write-Verbose -Message ('$ScriptName: {0}' -f $myScriptName)
-  Write-Verbose -Message ('$Command: {0}' -f $myCommand)
-  Write-Verbose -Message 'Assigning previously null MyCommand variables with CallStack values'
-  $MyCommandPath  = $myScriptName
-  $MyCommandName  = $myCommand
-}
-
-#'Optimize New-Object invocation, based on Don Jones' recommendation: https://technet.microsoft.com/en-us/magazine/hh750381.aspx
-$properties = [ordered]@{
-  'CommandName'        = $MyCommandName
-  'CommandPath'        = $MyCommandPath
-  'CommandType'        = $MyCommandType
-  'CommandModule'      = $MyCommandModule
-  'ModuleName'         = $MyModuleName
-  'CommandParameters'  = $MyCommandParameters.Keys
-  'ParameterSets'      = $MyParameterSets
-  'RemotingCapability' = $MyRemotingCapability
-  'Visibility'         = $MyVisibility
-}
-$MyScriptInfo = New-Object -TypeName PSObject -Property $properties
-Write-Verbose -Message ('[{0}] $MyScriptInfo populated' -f $MyInvocation.MyCommand.Name)
-
-# Cleanup
-foreach ($var in $properties.Keys) {
-  Remove-Variable -Name ('My{0}' -f $var) -Force
-}
-Remove-Variable -Name properties
-Remove-Variable -Name var
-
-if ($IsVerbose) {
-  Write-Verbose -Message '$MyScriptInfo:'
-  $Script:MyScriptInfo
+    if ($IsVerbose) { $MyScriptInfo }    
 }
 #End Region
 
@@ -93,32 +40,69 @@ $PSDefaultParameterValues = @{
     'New-PSSession:EnableNetworkAccess'   = $true
 }
 
+# Bootstrap likely set this, but since we're inside a macOS specific profile script ...
+$PathSplitChar = ':'
+
+# Customize PATH and other environment variables
+
+# ensure aws-cli path is in PATH
+# included in .oh-my-zsh/custom/path
+# $Env:AWSPATH=~/Library/Python/3.7/bin
+
+# ensure go path is defined, and also add GOPATH/bin in PATH
+# included in .oh-my-zsh/custom/path
+$Env:GOPATH=('{0}/go' -f $HOME)
+$GOBIN=('{0}/bin' -f $Env:GOPATH)
+
+# ensure PYTHONPATH is in PATH
+# included in .oh-my-zsh/custom/path
+# $PYTHONPATH="$HOME/Library/Python/3.7/lib/python/site-packages/:$HOME/Library/Python/3.8/lib/python/site-packages/:/usr/local/lib/python3.7/site-packages:/usr/local/lib/python3.8/site-packages"
+
+# ensure pylint path is in PATH
+# included in .oh-my-zsh/custom/path
+# PY3PATH=~/Library/Python/3.8/bin
+$PY3PATH = Join-Path -Path $HOME -ChildPath '/Library/Python/3.8/bin'
+
+# add $HOME/bin to PATH, for kubectl-eks (and aws-iam-authenticator?)
+#:/usr/local/Cellar/gettext/0.20.1/bin/gettext
+# export PATH=$PYTHONPATH:$PATH
+$Env:PATH = ($Env:AWSPATH, $GOBIN, $PY3PATH, $Env:PYTHONPATH, $Env:PATH) -join $PathSplitChar
+
 Write-Verbose -Message ' ... checking status of PSGallery ...'
 # Check PSRepository status
-$PSGallery = Get-PSRepository -Name PSGallery | Select-Object -Property Name,InstallationPolicy
-if ($PSGallery.InstallationPolicy -ne 'Trusted') {
+#$PSGallery = Get-PSRepository -Name PSGallery | Select-Object -Property Name,InstallationPolicy
+if ((Get-PSRepository -Name PSGallery | Select-Object -Property Name,InstallationPolicy).InstallationPolicy -ne 'Trusted') {
   Write-Output -InputObject '# Trusting PSGallery Repository #'
   Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
 } else {
-  Get-PSRepository
+  Get-PSRepository | Select-Object -Property Name,InstallationPolicy | Format-Table
 }
-Remove-Variable -Name PSGallery
+#Remove-Variable -Name PSGallery
 
 Write-Debug -Message (' # # # $VerbosePreference: {0} # # #' -f $VerbosePreference)
 Write-Verbose -Message 'Checking that .\scripts\ folder is available'
 
-if (($variable:myPSScriptsPath) -and (Test-Path -Path $myPSScriptsPath -PathType Container)) {
-    Write-Verbose -Message ('Loading scripts from {0} ...' -f $myPSScriptsPath)
-    Write-Output -InputObject ''
+# if ($variable:myPSScriptsPath) {
+#     Write-Verbose -Message ('Loading scripts from {0} ...' -f $myPSScriptsPath)
+#     Write-Output -InputObject ''
 
-    Write-Verbose -Message 'Initializing Set-ConsoleTheme.ps1'
-    . (Join-Path -Path $myScriptsPath -ChildPath 'Set-ConsoleTheme.ps1')
-    Write-Verbose -Message 'Set-ConsoleTheme'
-    Set-ConsoleTheme
+#     $LoadScript = Join-Path -Path $myPSScriptsPath -ChildPath 'Set-ConsoleTheme.ps1'
+#     if (Test-Path -Path $LoadScript) {
+#     Write-Verbose -Message 'Initializing Set-ConsoleTheme.ps1'
+#         Initialize-MyScript -Path $LoadScript
+#         if (Get-Command -Name Set-ConsoleTheme) {
+#     Write-Verbose -Message 'Set-ConsoleTheme'
+#     Set-ConsoleTheme
+#     } else {
+#             Write-Warning -Message 'Failed to get command Set-ConsoleTheme'
+#     }
 
-} else {
-    Write-Warning -Message ('Failed to locate Scripts folder {0}; run any scripts.' -f $myPSScriptsPath)
-}
+#     } else {
+#         Write-Warning -Message ('Failed to initialize (dot-source) {0}' -f $LoadScript)
+#     }
+# } else {
+#     Write-Warning -Message ('Failed to locate Scripts folder {0}; run any scripts.' -f $myPSScriptsPath)
+# }
 
 Write-Verbose -Message 'Declaring function Save-Credential'
 function Save-Credential {
@@ -162,15 +146,81 @@ New-Alias -Name rename -Value Rename-Item -ErrorAction SilentlyContinue
 
 Write-Output -InputObject ''
 
-# Backup local PowerShell log files
-Write-Output -InputObject 'Archive PowerShell logs'
-Backup-Logs
-# Write-Output -InputObject ('$VerbosePreference: {0} is {1}' -f $VerbosePreference, $IsVerbose)
+if (Get-Command -Name Backup-Logs -ErrorAction SilentlyContinue) {
+    # Backup local PowerShell log files
+    Write-Output -InputObject 'Archive PowerShell logs'
+    Backup-Logs
+}
 
 Write-Output -InputObject ' # End of PowerShell macOS Profile Script #'
 
-<#
     # For intra-profile/bootstrap script flow Testing
-    Write-Output -InputObject ''
+if ($IsVerbose) {
+    Write-Output -InputObject 'Verbose testing: pausing before proceeding'
     Start-Sleep -Seconds 3
-#>
+}
+
+Import-Module -Name posh-git -PassThru
+
+# Configure AWS profile, region
+#if ($null -eq $(Get-Variable -Name StoredAWSCredentials -ErrorAction SilentlyContinue)) {
+    Set-AWSCredential -ProfileName $((Get-AWSCredential -ListProfile)[0]) -Verbose
+#}
+#if ($null -eq $(Get-Variable -Name StoredAWSRegion -ErrorAction SilentlyContinue)) {
+    Set-DefaultAWSRegion -Region us-west-2 -Verbose
+#}
+
+
+# https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_prompts
+if ($IsVerbose) {Write-Output -InputObject ''}
+Write-Verbose -Message 'Defining custom prompt'
+function prompt {
+
+    Write-Verbose -Message 'Entered prompt function'
+
+    # $IsWindows, if not already provided by $Host (in recent pwsh releases), it's set in bootstrap.ps1
+    if ($IsWindows) {
+        if (-not (Get-Variable -Name IsAdmin -ValueOnly -ErrorAction SilentlyContinue)) {
+            $IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')
+            if ($IsAdmin) { $AdminPrompt = '[ADMIN]:' } else { $AdminPrompt = '' }
+        }
+    } else {
+        if (-not (Get-Variable -Name IsRoot -ValueOnly -ErrorAction Ignore)) {
+            $IsRoot = ($ENV:USER -eq 'root')
+            if ($IsRoot) { $AdminPrompt = '[root]:' } else { $AdminPrompt = '' }
+        }
+        if ($(hostname) -eq 'Bryan-Dady--MacBook-Pro') { $hostname = 'BCD-MBP' } else { $hostname = $(hostname)}
+    }
+
+    Write-Verbose -Message 'Determined hostname and AdminPrompt'
+    Write-Verbose -Message 'Detecting AWS config'
+
+    # $realLASTEXITCODE = $LASTEXITCODE
+    $AWSprompt = "_no_aws_profile_"
+    Try {
+        if ($null -ne $(Get-Variable -Name StoredAWSCredentials)) {
+            $AWSprompt = "AWS Profile: "
+            $AWSprompt += "$StoredAWSCredentials"
+            if (!$AWSprompt.EndsWith("@")) { $AWSprompt += "@" }
+        }
+        if ($null -ne $(Get-Variable -Name StoredAWSRegion)) {
+            $AWSprompt += "$StoredAWSRegion" }
+        $AWSprompt += " "
+    }
+    Catch {
+        $AWSprompt = ">no-aws-profile<"
+    }
+
+    # $global:LASTEXITCODE = $realLASTEXITCODE
+    $PSVer = ('PS {0}.{1}' -f $PSVersionTable.PSVersion.Major, $PSVersionTable.PSVersion.Minor)
+
+    if (Get-Variable -Name PSDebugContext -ValueOnly -ErrorAction SilentlyContinue) { $DebugPrompt = '[DEBUG]:' } else { $DebugPrompt = '' }
+    if (Get-Variable -Name PSConsoleFile -ValueOnly -ErrorAction SilentlyContinue)  { $PSCPrompt = "[PSConsoleFile: $PSConsoleFile]" } else { $PSCPrompt = '' }
+    if ($NestedPromptLevel -ge 1) { $PromptLevel = ('{0} >>_ ' -f $PSVer) } else { $PromptLevel = ('{0} >_ ' -f $PSVer) }
+
+    $prompt = "[{0}] " -f $hostname
+    $prompt += & $GitPromptScriptBlock
+    $prompt += ("`n{0}{1}{2}{3}{4}" -f $AWSPrompt, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel)
+    return $prompt
+}
+if ($IsVerbose) {Write-Output -InputObject ''}

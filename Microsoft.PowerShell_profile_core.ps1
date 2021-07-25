@@ -1,9 +1,8 @@
-#!/usr/local/bin/pwsh
+#!/usr/bin/env pwsh
 #Requires -ShellId Microsoft.PowerShell -PSEdition Core 
 #========================================
 # NAME      : Microsoft.PowerShell_profile.ps1
 # LANGUAGE  : Microsoft PowerShell
-# PowerShell $Profile
 # Created by New-Profile function of ProfilePal module
 # For more information, see https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_profiles
 #========================================
@@ -15,69 +14,13 @@ param ()
 #'$VerbosePreference = ''Continue'''
 #$VerbosePreference = 'Continue'
 
-Write-Verbose -Message 'Detect -Verbose $VerbosePreference'
-switch ($VerbosePreference) {
-    Stop             { $IsVerbose = $True }
-    Inquire          { $IsVerbose = $True }
-    Continue         { $IsVerbose = $True }
-    SilentlyContinue { $IsVerbose = $False }
-    Default          { if ('Verbose' -in $PSBoundParameters.Keys) {$IsVerbose = $True} else {$IsVerbose = $False} }
+# Region MyScriptInfo
+# Only call (and use results from Get-MyScriptInfo function, if it was loaded from ./Bootstrap.ps1)
+if (Test-Path -Path Function:\Get-MyScriptInfo) {
+    $MyScriptInfo = Get-MyScriptInfo($MyInvocation) -Verbose
+
+    if ($IsVerbose) { $MyScriptInfo }    
 }
-Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f $VerbosePreference, $IsVerbose)
-
-#Region MyScriptInfo
-    Write-Verbose -Message ('[{0}] Populating $MyScriptInfo' -f $MyInvocation.MyCommand.Name)
-    $MyCommandName        = $MyInvocation.MyCommand.Name
-    $MyCommandPath        = $MyInvocation.MyCommand.Path
-    $MyCommandType        = $MyInvocation.MyCommand.CommandType
-    $MyCommandModule      = $MyInvocation.MyCommand.Module
-    $MyModuleName         = $MyInvocation.MyCommand.ModuleName
-    $MyCommandParameters  = $MyInvocation.MyCommand.Parameters
-    $MyParameterSets      = $MyInvocation.MyCommand.ParameterSets
-    $MyRemotingCapability = $MyInvocation.MyCommand.RemotingCapability
-    $MyVisibility         = $MyInvocation.MyCommand.Visibility
-
-    if (($null -eq $MyCommandName) -or ($null -eq $MyCommandPath)) {
-        # We didn't get a successful command / script name or path from $MyInvocation, so check with CallStack
-        Write-Verbose -Message 'Getting PSCallStack [$CallStack = Get-PSCallStack]'
-        $CallStack      = Get-PSCallStack | Select-Object -First 1
-        # $CallStack | Select Position, ScriptName, Command | format-list # FunctionName, ScriptLineNumber, Arguments, Location
-        $myScriptName   = $CallStack.ScriptName
-        $myCommand      = $CallStack.Command
-        Write-Verbose -Message ('$ScriptName: {0}' -f $myScriptName)
-        Write-Verbose -Message ('$Command: {0}' -f $myCommand)
-        Write-Verbose -Message 'Assigning previously null MyCommand variables with CallStack values'
-        $MyCommandPath  = $myScriptName
-        $MyCommandName  = $myCommand
-    }
-
-    #'Optimize New-Object invocation, based on Don Jones' recommendation: https://technet.microsoft.com/en-us/magazine/hh750381.aspx
-    $properties = [ordered]@{
-        'CommandName'        = $MyCommandName
-        'CommandPath'        = $MyCommandPath
-        'CommandRoot'        = Split-Path -Path $MyCommandPath -Parent
-        'CommandType'        = $MyCommandType
-        'CommandModule'      = $MyCommandModule
-        'ModuleName'         = $MyModuleName
-        'CommandParameters'  = $MyCommandParameters.Keys
-        'ParameterSets'      = $MyParameterSets
-        'RemotingCapability' = $MyRemotingCapability
-        'Visibility'         = $MyVisibility
-    }
-    $MyScriptInfo = New-Object -TypeName PSObject -Property $properties -ErrorAction SilentlyContinue
-    Write-Verbose -Message ('[{0}] $MyScriptInfo populated' -f $MyInvocation.MyCommand.Name)
-
-    # Cleanup
-    foreach ($var in $properties.Keys) {
-        Remove-Variable -Name ('My{0}' -f $var) -Force -ErrorAction SilentlyContinue
-    }
-    Remove-Variable -Name properties
-    Remove-Variable -Name var
-
-    if ($IsVerbose) {
-        Write-Verbose -Message '$MyScriptInfo:'
-        $Script:MyScriptInfo
-    }
 #End Region
 
 # capture starting path so we can go back after other things below might move around
