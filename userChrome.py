@@ -28,6 +28,7 @@ import os
 #from os import path
 from pathlib import Path
 from pathlib import PurePath
+from pathlib import PosixPath
 import sys
 import time
 import re
@@ -54,28 +55,43 @@ print_var('hostOS', hostOS)
 
 # Create userChrome.css file, only if necessary (does not exist by default)
 # -- the file lives in the user's Firefox profile folder, which is a random / unique, per-user path
-# -- 1. Detect/derive path to user's Firefox profile folder / example from Windows:  %APPDATA%\Mozilla\Firefox\Profiles\0y8i0p8f.default 
+# -- 1. Detect/derive path to user's Firefox profile folder / example from Windows:  %APPDATA%\Mozilla\Firefox\Profiles\0y8i0p8f.default
 # -- confirm path is valid, with APPDATA derived from system/shell environment variable e.g. %APPDATA%\Mozilla\Firefox\Profiles\
 # -- Ideally, there's only one subfolder (e.g. '0y8i0p8f.default') -- set it as var $profileRoot
 
 if IsWindows:
-    #APPDATA = os.environ['APPDATA']
+    # On Windows Firefox\Profiles reside under APPDATA = os.environ['APPDATA']
     profileBase = os.path.expandvars('%APPDATA%\Mozilla\Firefox\Profiles')
-else:
-    # proceed as posix, for IsLinux or IsMacOS
-    profileBase = os.path.expandvars('~/.local/Mozilla/Firefox/Profiles')
+    # Also, it seems the default Profile folder name syntax is different across platforms
+    regExp = '\S+\.default$'
+
+if IsMacOS:
+    # On macOS Firefox\Profiles reside under ~/Library/Application Support/Firefox/
+    #profileBase = os.path.expandvars('~/Library/Application Support/Firefox/')
+    profileBase = PosixPath('~/Library/Application Support/Firefox/')
+    profileBase.expanduser()
+    # Also, it seems the default Profile folder name syntax is different across platforms
+    regExp = '\S+\.default-\d+'
+
+if IsLinux:
+    # On Linux Firefox\Profiles reside under ~/.mozilla/firefox
+    profileBase = PosixPath('~/.mozilla/firefox')
+    profileBase.expanduser()
+    #profileBase = os.path.expandvars('~/.mozilla/firefox')
+    # Also, it seems the default Profile folder name syntax is different across platforms
+    regExp = '\S+\.default'
 
 print_var('profileBase', profileBase)
 
 profilePath = Path(profileBase)
 
 # Iterate subdirectories')
-for child in profilePath.iterdir(): 
+for child in profilePath.iterdir():
     print_var('child', child)
     folderName = PurePath(child).name
     print_var('folderName', folderName)
     # evaluate the child directory name via RegExp (re)
-    if re.search("\S+\.default$", folderName):
+    if re.search(regExp, folderName):
         profileRoot = Path(child)
         print_var('profileRoot', profileRoot)
     else:
@@ -94,7 +110,7 @@ else:
     chromePath.mkdir(exist_ok=True)
 
 # Finish establishing path to ../chrome/userChrome.css
-userChromePath = chromePath.joinpath('userChrome.css') 
+userChromePath = chromePath.joinpath('userChrome.css')
 
 # if IsVersbose (testing), delete / remove / unlink it
 if IsVerbose:
@@ -115,7 +131,7 @@ else:
 
 print_var('userChromePath exists', userChromePath.exists())
 
-# # 
+# #
 # if IsVersbose, refresh, read / print contents of file
 if IsVerbose or userChromePath.exists():
     #print(' Found!: {}'.format(userChromePath))

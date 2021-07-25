@@ -1,4 +1,4 @@
-#!pwsh
+﻿#!/usr/bin/env pwsh
 #Requires -Version 5
 #========================================
 # NAME      : Bootstrap.ps1
@@ -16,17 +16,35 @@ param()
 #'$VerbosePreference = ''Continue'''
 #$VerbosePreference = 'Continue'
 
-Write-Verbose -Message 'Detect -Verbose $VerbosePreference'
-switch ($VerbosePreference) {
-    Stop             { $IsVerbose = $True }
-    Inquire          { $IsVerbose = $True }
-    Continue         { $IsVerbose = $True }
-    SilentlyContinue { $IsVerbose = $False }
-    Default          { if ('Verbose' -in $PSBoundParameters.Keys) {$IsVerbose = $True} else {$IsVerbose = $False} }
+Write-Verbose -Message 'Loading function Get-IsVerbose'
+function Global:Get-IsVerbose {
+    [CmdletBinding()]
+    param ()
+
+    Write-Debug -Message 'Detect -Verbose $VerbosePreference'
+
+    switch ($VerbosePreference) {
+        Stop             { $IsVerbose = $True }
+        Inquire          { $IsVerbose = $True }
+        Continue         { $IsVerbose = $True }
+        SilentlyContinue { $IsVerbose = $False }
+        Default          { if ('Verbose' -in $PSBoundParameters.Keys) {$IsVerbose = $True} else {$IsVerbose = $False} }
+    }
+
+    Write-Debug -Message ('$VerbosePreference: {0} is {1}' -f $VerbosePreference, $IsVerbose)
+
+    $global:IsVerbose = $IsVerbose
+    return $IsVerbose
 }
+
 Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f $VerbosePreference, $IsVerbose)
 
-#Region MyScriptInfo
+Write-Verbose -Message 'Loading function Get-MyScriptInfo'
+function Global:Get-MyScriptInfo {
+    [CmdletBinding()]
+    param ($MyInvocation)
+    
+    # region 
     Write-Verbose -Message ('[{0}] Populating $MyScriptInfo' -f $MyInvocation.MyCommand.Name)
     $MyCommandName        = $MyInvocation.MyCommand.Name
     $MyCommandPath        = $MyInvocation.MyCommand.Path
@@ -68,18 +86,14 @@ Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f
     $MyScriptInfo = New-Object -TypeName PSObject -Property $properties -ErrorAction SilentlyContinue
     Write-Verbose -Message ('[{0}] $MyScriptInfo populated' -f $MyInvocation.MyCommand.Name)
 
-    # Cleanup
-    foreach ($var in $properties.Keys) {
-        Remove-Variable -Name ('My{0}' -f $var) -Force -ErrorAction SilentlyContinue
-    }
-    Remove-Variable -Name properties
-    Remove-Variable -Name var
+    return $MyScriptInfo
+}
 
-    if ($IsVerbose) {
-        Write-Verbose -Message '$MyScriptInfo:'
-        $Script:MyScriptInfo
-    }
-#End Region
+$IsVerbose = Get-IsVerbose
+$MyScriptInfo = Get-MyScriptInfo($MyInvocation)
+$global:MyScriptInfo = $MyScriptInfo
+
+if ($IsVerbose) { $MyScriptInfo }
 
 # format output with some whitespace
 Write-Output -InputObject ''
@@ -93,30 +107,19 @@ if ($MyScriptInfo.CommandPath -match 'OneDrive') {
 }
 Write-Verbose -Message (' ... from {0}' -f $MyScriptInfo.CommandPath)
 
+
 #Region HostOS
-    <#
-        Get-Variable -Name Is* -Exclude ISERecent | FT
-
-        Name                           Value
-        ----                           -----
-        IsAdmin                        False
-        IsCoreCLR                      True
-        IsLinux                        False
-        IsMacOS                        True
-        IsWindows                      False
-    #>
-
     # Detect older versions of PowerShell and add in new automatic variables for cross-platform consistency
     if ([Version]('{0}.{1}' -f $Host.Version.Major, $Host.Version.Minor) -le [Version]'5.1') {
-        $Global:IsWindows = $True
-        $Global:IsCoreCLR = $False
-        $Global:IsLinux   = $False
-        $Global:IsMacOS   = $False
-        $Global:IsAdmin   = $False
-        $Global:IsServer  = $False
+        $global:IsWindows = $True
+        $global:IsCoreCLR = $False
+        $global:IsLinux   = $False
+        $global:IsMacOS   = $False
+        $global:IsAdmin   = $False
+        $global:IsServer  = $False
         if (-not (Get-Variable -Name PSEdition -Scope Global -ErrorAction SilentlyContinue)) {
             if ($Host.Name -eq 'ConsoleHost') {
-                $Global:PSEdition = 'Desktop'
+                $global:PSEdition = 'Desktop'
             }
         }
     }
@@ -128,11 +131,11 @@ Write-Verbose -Message (' ... from {0}' -f $MyScriptInfo.CommandPath)
         $LastBootUpTime = $hostOSInfo.LastBootUpTime # @{Name="Uptime";Expression={((Get-Date)-$_.LastBootUpTime -split '\.')[0]}}
         $hostOSCaption = $hostOSInfo.Caption -replace 'Microsoft ', ''
         if ($hostOSCaption -like '*Windows Server*') {
-            $Global:IsServer = $true
+            $global:IsServer = $true
         }
 
         # Check admin rights / role; same approach as Test-LocalAdmin function in Sperry module
-        $Global:IsAdmin = (([security.principal.windowsprincipal] [security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+        $global:IsAdmin = (([security.principal.windowsprincipal] [security.principal.windowsidentity]::GetCurrent()).isinrole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     }
 
     if (Get-Variable -Name IsLinux -ValueOnly -ErrorAction SilentlyContinue) {
@@ -159,6 +162,10 @@ Write-Verbose -Message (' ... from {0}' -f $MyScriptInfo.CommandPath)
 
     Write-Output -InputObject ''
     Write-Output -InputObject (' # {0} {1} {2} on {3} - {4} #' -f $ShellId, $Host.version.toString().substring(0,3), $PSEdition, $hostOSCaption, $Env:ComputerName)
+
+    Write-Verbose -Message ('Setting environment SHELL to {0} {1} {2}' -f $ShellId, $PSEdition, $PSVersionTable.PSVersion.ToString())
+    $Env:SHELL = ('{0} {1} {2}' -f $ShellId, $PSEdition, $PSVersionTable.PSVersion.ToString())
+    $GLOBAL:SHELL=$(which pwsh)
 
     Write-Verbose -Message ('Setting environment HostOS to {0}' -f $hostOS)
     $Env:HostOS = $hostOS
@@ -212,17 +219,11 @@ if ($IsVerbose) { Write-Output -InputObject '' }
     }
 
     # Bootstrap is intended to live next to User Profile (pwsh) scripts, so regardless of PSEdition (Core or Desktop), it's root should be $myPSHome
-    $myPSHome =$MyScriptInfo.CommandRoot
+    $global:myPSHome =$MyScriptInfo.CommandRoot
 
     if ($IsWindows) {
-    #     $myPSHome = ('{0}\WindowsPowerShell' -f $HomeDocsPath)
-    #     if (($Global:HOME -like "$Env:SystemDrive*") -and ($PSEdition -eq 'Core')) {
-    #         Write-Verbose -Message 'Using local PS Core path: ''PowerShell''.' -Verbose
-    #         $myPSHome = ('{0}\PowerShell' -f $HomeDocsPath)
-    #     }
-
         # In Windows, semicolon is used to separate entries in the PATH variable
-        $Private:SplitChar = ';'
+        $PathSplitChar = ';'
 
         #Define modules, scripts, and log folders within user's PowerShell folder, creating the SubFolders if necessary
         $myPSModulesPath = (Join-Path -Path $myPSHome -ChildPath 'Modules')
@@ -261,7 +262,7 @@ if ($IsVerbose) { Write-Output -InputObject '' }
         Set-Variable -Name myPSModulesPath -Value $myPSModulesPath -Force -Scope Global
 
         # In non-Windows OS, colon character is used to separate entries in the PATH variable
-        $Private:SplitChar = ':'
+        $PathSplitChar = ':'
         if (-not (Test-Path -Path $HOME)) {
             Write-Verbose -Message 'Setting $HOME to $myPSHome'
             Set-Variable -Name HOME -Value $(Split-Path -Path $myPSHome -Parent) -Force
@@ -290,30 +291,12 @@ if ($IsVerbose) { Write-Output -InputObject '' }
     }
 #End Region
 
-<#
-  #Region ModulePath
-    # check and conditionally update/fix PSModulePath
-    Write-Verbose -Message ('MyPSModulesPath: {0}' -f $myPSModulesPath)
-
-    # Check if $myPSModulesPath is in $Env:PSModulePath, and while we're at it, cleanup $Env:PSModulePath for duplicates
-    Write-Debug -Message ('($myPSModulesPath -in @($Env:PSModulePath -split $SplitChar) = {0}' -f ($myPSModulesPath -in @($Env:PSModulePath -split $SplitChar)))
-    $EnvPSModulePath = (($Env:PSModulePath.split($SplitChar)).trim('/')).trim('\') | Sort-Object -Unique
-    if (($null -ne $myPSModulesPath) -and (-not ($myPSModulesPath -in $EnvPSModulePath))) {
-        Write-Verbose -Message ('Adding Modules Path: {0} to $Env:PSModulePath' -f $myPSModulesPath) -Verbose
-        $Env:PSModulePath = $($EnvPSModulePath -join('{0}')) + $('{0}{1}' -f $SplitChar, $myPSModulesPath)
-
-        # post-update cleanup
-        if (Test-Path -Path (Join-Path -Path $myPSScriptsPath -ChildPath 'Cleanup-ModulePath.ps1') -ErrorAction SilentlyContinue) {
-            & $myPSScriptsPath\Cleanup-ModulePath.ps1
-            Write-Output -InputObject $Env:PSModulePath
-        }
-    }
-    Remove-Variable -Name SplitChar -ErrorAction SilentlyContinue
-  #End Region ModulePath
-#>
 Write-Output -InputObject ''
 Write-Output -InputObject ' # # PowerShell Environment Bootstrap Complete #'
 Write-Output -InputObject ''
 
-# Uncomment the following line for testing / pausing between profile/bootstrap scripts
-#Start-Sleep -Seconds 5
+# For intra-profile/bootstrap script flow Testing
+if ($IsVerbose) {
+    Write-Output -InputObject 'Verbose/testing: pausing before proceeding'
+    Start-Sleep -Seconds 3
+}
