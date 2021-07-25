@@ -50,7 +50,6 @@ function global:Initialize-MyScript {
       # dot-source script file containing Merge-MyPSFiles and related functions
       . $Path
       return $?
-
 }
 
 # Region Bootstrap
@@ -118,15 +117,6 @@ Set-Location $startingPath
 # & Invoke-Expression (New-Object Net.WebClient).DownloadString('http://bit.ly/e0Mw9w')
 # # Start-Sleep -Seconds 3
 
-if (Get-Command -Name Set-ConsoleTitle -ErrorAction SilentlyContinue) {
-    # Call Set-ConsoleTitle, from ProfilePal module
-    if ($IsVerbose) {Write-Output -InputObject ''}
-    Write-Verbose -Message ' # Set-ConsoleTitle >'
-    Set-ConsoleTitle
-    Write-Verbose -Message ' # < Set-ConsoleTitle'
-    if ($IsVerbose) {Write-Output -InputObject ''}
-}
-
 Write-Verbose -Message ('$HostOS = ''{0}''' -f $HostOS)
 
 # Detect host OS and then jump to the OS specific profile sub-script
@@ -153,7 +143,6 @@ Write-Verbose -Message ('$SubProfile = ''{0}''' -f $OSProfile)
 if (Test-Path -Path $OSProfile) {
     # dot-source it
     . $OSProfile
-    #Initialize-MyScript -Path $OSProfile
     Remove-Variable -Name OSProfile -Force
 } else {
     throw ('Failed to locate OS specific profile script: {0}' -f $OSProfile)
