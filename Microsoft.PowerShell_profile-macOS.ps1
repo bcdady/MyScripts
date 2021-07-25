@@ -176,8 +176,6 @@ if ($IsVerbose) {Write-Output -InputObject ''}
 Write-Verbose -Message 'Defining custom prompt'
 function prompt {
 
-    Write-Verbose -Message 'Entered prompt function'
-
     # $IsWindows, if not already provided by $Host (in recent pwsh releases), it's set in bootstrap.ps1
     if ($IsWindows) {
         if (-not (Get-Variable -Name IsAdmin -ValueOnly -ErrorAction SilentlyContinue)) {
@@ -192,10 +190,6 @@ function prompt {
         if ($(hostname) -eq 'Bryan-Dady--MacBook-Pro') { $hostname = 'BCD-MBP' } else { $hostname = $(hostname)}
     }
 
-    Write-Verbose -Message 'Determined hostname and AdminPrompt'
-    Write-Verbose -Message 'Detecting AWS config'
-
-    # $realLASTEXITCODE = $LASTEXITCODE
     $AWSprompt = "_no_aws_profile_"
     Try {
         if ($null -ne $(Get-Variable -Name StoredAWSCredentials)) {
@@ -211,7 +205,6 @@ function prompt {
         $AWSprompt = ">no-aws-profile<"
     }
 
-    # $global:LASTEXITCODE = $realLASTEXITCODE
     $PSVer = ('PS {0}.{1}' -f $PSVersionTable.PSVersion.Major, $PSVersionTable.PSVersion.Minor)
 
     if (Get-Variable -Name PSDebugContext -ValueOnly -ErrorAction SilentlyContinue) { $DebugPrompt = '[DEBUG]:' } else { $DebugPrompt = '' }
