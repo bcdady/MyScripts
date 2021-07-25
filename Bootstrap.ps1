@@ -36,6 +36,7 @@ function Global:Get-IsVerbose {
     $global:IsVerbose = $IsVerbose
     return $IsVerbose
 }
+
 Write-Verbose -Message ('$VerbosePreference = ''{0}'' : $IsVerbose = ''{1}''' -f $VerbosePreference, $IsVerbose)
 
 Write-Verbose -Message 'Loading function Get-MyScriptInfo'
@@ -84,20 +85,6 @@ function Global:Get-MyScriptInfo {
     }
     $MyScriptInfo = New-Object -TypeName PSObject -Property $properties -ErrorAction SilentlyContinue
     Write-Verbose -Message ('[{0}] $MyScriptInfo populated' -f $MyInvocation.MyCommand.Name)
-
-    # Cleanup
-    # foreach ($var in $Private:properties.Keys) {
-    #     Remove-Variable -Name ('My{0}' -f $var) -Force
-    # }
-    #Remove-Variable -Name properties
-    #Remove-Variable -Name var
-
-    # $IsVerbose = $false
-    # if ('Verbose' -in $PSBoundParameters.Keys) {
-    #     Write-Verbose -Message 'Output Level is [Verbose]. $MyScriptInfo is:'
-    #     $IsVerbose = $true
-    #     $MyScriptInfo
-    # }
 
     return $MyScriptInfo
 }
@@ -236,7 +223,7 @@ if ($IsVerbose) { Write-Output -InputObject '' }
 
     if ($IsWindows) {
         # In Windows, semicolon is used to separate entries in the PATH variable
-        $Private:SplitChar = ';'
+        $PathSplitChar = ';'
 
         #Define modules, scripts, and log folders within user's PowerShell folder, creating the SubFolders if necessary
         $myPSModulesPath = (Join-Path -Path $myPSHome -ChildPath 'Modules')
@@ -275,7 +262,7 @@ if ($IsVerbose) { Write-Output -InputObject '' }
         Set-Variable -Name myPSModulesPath -Value $myPSModulesPath -Force -Scope Global
 
         # In non-Windows OS, colon character is used to separate entries in the PATH variable
-        $Private:SplitChar = ':'
+        $PathSplitChar = ':'
         if (-not (Test-Path -Path $HOME)) {
             Write-Verbose -Message 'Setting $HOME to $myPSHome'
             Set-Variable -Name HOME -Value $(Split-Path -Path $myPSHome -Parent) -Force

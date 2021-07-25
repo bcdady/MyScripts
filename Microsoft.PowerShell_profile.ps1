@@ -51,11 +51,6 @@ function global:Initialize-MyScript {
       . $Path
       return $?
 
-    } # End of Process block
-
-    # End block of Advanced Function
-    End { }
-
 }
 
 # Region Bootstrap
@@ -119,39 +114,10 @@ Push-Location -Path $MyScriptInfo.CommandRoot -PassThru
 # In case any intermediary scripts or module loads change our current directory, restore original path, before it's locked into the window title by Set-ConsoleTitle
 Set-Location $startingPath
 
-    return "[{0} @ {1}]`n{2}{3}{4}{5}" -f $Env:COMPUTERNAME, $PWD.Path, $AdminPrompt, $PSCPrompt, $DebugPrompt, $PromptLevel
-}
-if ($IsVerbose) {Write-Output -InputObject ''}
+# Sample how-to download in PowerShell, featuring a shell/console ASCII delight
+# & Invoke-Expression (New-Object Net.WebClient).DownloadString('http://bit.ly/e0Mw9w')
+# # Start-Sleep -Seconds 3
 
-# Invoke Bootstrap.ps1, from the same root path as this $PROFILE script
-if (Get-Variable -Name 'myPS*' -ValueOnly -ErrorAction SilentlyContinue) {
-    # PowerShell path variables have been initialized via a recent invocation of bootstrap.ps1
-    Write-Output -InputObject ''
-    Write-Output -InputObject 'My PowerShell paths:'
-    Get-Variable -Name 'myPS*' | Format-Table -AutoSize
-} else {
-    # initialize variables, via bootstrap.ps1
-    Write-Verbose -Message ('(Test-Path -Path ./bootstrap.ps1): {0}' -f (Test-Path -Path ./Bootstrap.ps1))
-    if (Test-Path -Path ./Bootstrap.ps1) {
-        # Dot-source Bootstrap script
-        Write-Verbose -Message '. ./Bootstrap.ps1'
-        . ./Bootstrap.ps1
-    }
-    if (Get-Variable -Name 'myPS*' -ValueOnly -ErrorAction SilentlyContinue) {
-        # PowerShell path variables have been initialized via a recent invocation of bootstrap.ps1
-        Write-Output -InputObject ''
-        Write-Output -InputObject 'My PowerShell paths:'
-        Get-Variable -Name 'myPS*' | Format-Table -AutoSize
-    } else {
-        Write-Warning -Message './Bootstrap.ps1 may have encountered errors.'
-    }
-}
-#End Region
-
-<# Sample how-to download in PowerShell, featuring a shell/console ASCII delight
-    & Invoke-Expression (New-Object Net.WebClient).DownloadString('http://bit.ly/e0Mw9w')
-    # start-sleep -Seconds 3
-#>
 if (Get-Command -Name Set-ConsoleTitle -ErrorAction SilentlyContinue) {
     # Call Set-ConsoleTitle, from ProfilePal module
     if ($IsVerbose) {Write-Output -InputObject ''}
@@ -160,47 +126,6 @@ if (Get-Command -Name Set-ConsoleTitle -ErrorAction SilentlyContinue) {
     Write-Verbose -Message ' # < Set-ConsoleTitle'
     if ($IsVerbose) {Write-Output -InputObject ''}
 }
-
-Write-Verbose -Message 'Importing function Initialize-MyScript'
-function Initialize-MyScript {
-    [cmdletbinding()]
-    param(
-      # Specifies a path to a script to be run
-      [Parameter(Mandatory,
-        Position=0,
-        ParameterSetName="ParameterSetName",
-        ValueFromPipeline,
-        ValueFromPipelineByPropertyName,
-        HelpMessage="Path to one or more locations.")]
-      [Alias("PSPath")]
-      [ValidateNotNullOrEmpty()]
-      [ValidateScript({
-            If (Test-Path -Path $PSItem -PathType Leaf) {
-                $True
-            } else {
-                Throw "\tError: $PSItem not found"
-            }
-        })]
-      [string[]]
-      $Path
-    )
-
-    # Begin block of Advanced Function
-    Begin {
-      Test-Path -Path $Path -PathType Leaf -ErrorAction Stop
-      $ScriptName = Split-Path -Path $Path -Leaf
-    } # End of Begin block
-
-    # Process block of Advanced Function
-    Process {
-      Write-Verbose -Message (' # Initializing {0} #' -f $ScriptName)
-      Write-Verbose -Message (' # From Path: {0} #' -f $Path)
-      # dot-source script file containing Merge-MyPSFiles and related functions
-      . $Path
-
-    } # End of Process block
-
-  }
 
 Write-Verbose -Message ('$HostOS = ''{0}''' -f $HostOS)
 
