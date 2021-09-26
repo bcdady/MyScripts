@@ -36,13 +36,13 @@ function global:Initialize-MyScript {
       [System.Object[]]
       $Path
     )
-
+    
     # Begin block of Advanced Function
     Begin {
       Test-Path -Path $Path -PathType Leaf -ErrorAction Stop
       $ScriptName = Split-Path -Path $Path -Leaf
     } # End of Begin block
-
+    
     # Process block of Advanced Function
     Process {
       Write-Verbose -Message (' # Initializing {0} #' -f $ScriptName)
@@ -50,6 +50,12 @@ function global:Initialize-MyScript {
       # dot-source script file containing Merge-MyPSFiles and related functions
       . $Path
       return $?
+      
+    } # End of Process block
+    
+    # End block of Advanced Function
+    End { }
+
 }
 
 # Region Bootstrap

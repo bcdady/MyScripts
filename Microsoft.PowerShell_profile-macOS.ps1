@@ -60,8 +60,7 @@ $GOBIN=('{0}/bin' -f $Env:GOPATH)
 
 # ensure pylint path is in PATH
 # included in .oh-my-zsh/custom/path
-# PY3PATH=~/Library/Python/3.8/bin
-$PY3PATH = Join-Path -Path $HOME -ChildPath '/Library/Python/3.8/bin'
+# $PY3PATH = Join-Path -Path (Get-ChildItem -Path $HOME/Library/Python/3.* | Select-Object -Last 1 -Property FullName).FullName -ChildPath 'bin'
 
 # add $HOME/bin to PATH, for kubectl-eks (and aws-iam-authenticator?)
 #:/usr/local/Cellar/gettext/0.20.1/bin/gettext
@@ -176,6 +175,8 @@ if ($IsVerbose) {Write-Output -InputObject ''}
 Write-Verbose -Message 'Defining custom prompt'
 function prompt {
 
+    Write-Verbose -Message 'Entered prompt function'
+
     # $IsWindows, if not already provided by $Host (in recent pwsh releases), it's set in bootstrap.ps1
     if ($IsWindows) {
         if (-not (Get-Variable -Name IsAdmin -ValueOnly -ErrorAction SilentlyContinue)) {
@@ -190,6 +191,10 @@ function prompt {
         if ($(hostname) -eq 'Bryan-Dady--MacBook-Pro') { $hostname = 'BCD-MBP' } else { $hostname = $(hostname)}
     }
 
+    Write-Verbose -Message 'Determined hostname and AdminPrompt'
+    Write-Verbose -Message 'Detecting AWS config'
+
+    # $realLASTEXITCODE = $LASTEXITCODE
     $AWSprompt = "_no_aws_profile_"
     Try {
         if ($null -ne $(Get-Variable -Name StoredAWSCredentials)) {
